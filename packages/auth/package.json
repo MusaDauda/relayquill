@@ -1,0 +1,28 @@
+{
+  "name": "@relayquill/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint --max-warnings 0 src"
+  },
+  "dependencies": {
+    "@relayquill/contracts": "0.1.0",
+    "@relayquill/domain": "0.1.0",
+    "@relayquill/runtime": "0.1.0",
+    "@simplewebauthn/server": "14.1.0"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": [
+      "node"
+    ]
+  },
+  "references": [
+    {
+      "path": "../domain"
+    },
+    {
+      "path": "../contracts"
+    },
+    {
+      "path": "../runtime"
+    },
+    {
+      "path": "../auth"
+    },
+    {
+      "path": "../event-schema"
+    },
+    {
+      "path": "../signing"
+    },
+    {
+      "path": "../egress"
+    },
+    {
+      "path": "../broker"
+    }
+  ],
+  "include": [
+    "src/**/*.ts"
+  ]
+}

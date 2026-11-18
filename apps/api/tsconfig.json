@@ -1,0 +1,40 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "types": [
+      "node"
+    ]
+  },
+  "references": [
+    {
+      "path": "../../packages/domain"
+    },
+    {
+      "path": "../../packages/contracts"
+    },
+    {
+      "path": "../../packages/runtime"
+    },
+    {
+      "path": "../../packages/auth"
+    },
+    {
+      "path": "../../packages/application"
+    },
+    {
+      "path": "../../packages/postgres"
+    },
+    {
+      "path": "../../packages/event-schema"
+    },
+    {
+      "path": "../../packages/signing"
+    }
+  ],
+  "include": [
+    "src/**/*.ts"
+  ]
+}

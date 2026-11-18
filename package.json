@@ -1,0 +1,35 @@
+{
+  "name": "relayquill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.13.0",
+  "engines": {
+    "node": ">=24.16.0 <27"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "boundaries": "node tools/verify-import-boundaries.mjs",
+    "typecheck": "node tools/typecheck-workspaces.mjs",
+    "lint": "eslint --max-warnings 0 --no-error-on-unmatched-pattern apps packages examples tools tests",
+    "build": "node tools/build-workspaces.mjs",
+    "hygiene": "node tools/check-hygiene.mjs",
+    "test": "node --test tests/tooling && npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.16",
+    "@eslint/js": "10.0.1",
+    "@microsoft/api-extractor": "7.60.1",
+    "@playwright/test": "1.60.0",
+    "@types/node": "24.19.2",
+    "esbuild": "0.28.2",
+    "eslint": "10.15.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.73.0"
+  }
+}

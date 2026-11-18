@@ -1,0 +1,52 @@
+# Untouched external reference directory
+/Day-05-Relayquill/
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build, typecheck, and bundle outputs
+dist/
+**/dist/
+build/
+**/build/
+*.tsbuildinfo
+.turbo/
+.vite/
+coverage/
+*.tgz
+
+# Environment, secrets, and local cryptographic artifacts
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.creds
+*.seed
+*.p12
+
+# Test, Playwright, and runtime outputs
+playwright-report/
+test-results/
+blob-report/
+logs/
+*.log
+npm-debug.log*
+.local-run/
+.relayquill/
+
+# Infrastructure state
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+tfplan
+*.tfplan
+
+# OS and editor artifacts
+.DS_Store
+Thumbs.db

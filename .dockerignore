@@ -1,0 +1,49 @@
+# Untouched external reference directory
+/Day-05-Relayquill/
+
+# Git and repository metadata
+.git/
+.gitignore
+.github/
+
+# Dependencies and build artifacts (rebuilt cleanly inside multi-stage Dockerfiles)
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+*.tsbuildinfo
+.turbo/
+.vite/
+coverage/
+*.tgz
+
+# Secrets and environment files
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.creds
+*.seed
+*.p12
+
+# Evidence, tests, logs, and Terraform state
+docs/evidence/
+tests/
+playwright-report/
+test-results/
+blob-report/
+logs/
+*.log
+.local-run/
+.relayquill/
+infra/aws/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+
+# OS artifacts
+.DS_Store
+Thumbs.db

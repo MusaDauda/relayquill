@@ -1,0 +1,69 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "self_hosted",
+  "process_role": "relay",
+  "database": {
+    "mode": "standard_tls",
+    "isolation": "separate_databases",
+    "host": "postgres.internal.relayquill.example",
+    "port": 5432,
+    "name": "relayquill",
+    "schema": "rq",
+    "support_schema": "rq_support",
+    "role": "rq_relay",
+    "authentication": "secret_provider_password",
+    "password_secret_ref": "file:/run/secrets/pg_password_rq_relay",
+    "tls_mode": "verify_full",
+    "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+    "pool_mode": "direct",
+    "maximum_connections": 8,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "broker": {
+    "mode": "standard_tls",
+    "servers": [
+      "tls://broker-1.internal.relayquill.example:4222",
+      "tls://broker-2.internal.relayquill.example:4222",
+      "tls://broker-3.internal.relayquill.example:4222"
+    ],
+    "auth_mode": "nkey_seed",
+    "secret_ref": "file:/run/secrets/nats_rq_relay_nkey.seed",
+    "tls": {
+      "enabled": true,
+      "handshake_first": true,
+      "ca_file": "/etc/relayquill/certs/broker-ca.pem",
+      "reject_unauthorized": true
+    },
+    "stream_name": "RELAYQUILL_EVENTS_V1",
+    "subject_prefix": "",
+    "consumer_name": "RELAYQUILL_FANOUT_V1",
+    "replicas": 3,
+    "max_msgs": 10000000,
+    "max_bytes": 21474836480,
+    "max_msg_size": 4096,
+    "max_age_ns": 86400000000000,
+    "duplicate_window_ns": 120000000000,
+    "inbox_prefix": "_INBOX.rq.relay"
+  },
+  "relay": {
+    "poll_interval_ms": 200,
+    "batch_size": 32,
+    "claim_lease_ms": 30000,
+    "publish_concurrency": 16,
+    "publish_timeout_ms": 5000
+  },
+  "telemetry": {
+    "enabled": true,
+    "service_name": "relayquill-relay",
+    "max_queue_size": 2048,
+    "max_export_batch_size": 256
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

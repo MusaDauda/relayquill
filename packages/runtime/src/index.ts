@@ -14,3 +14,11 @@ export function getRuntimeIdentity(): RuntimeIdentity {
     platform: process.platform
   };
 }
+
+export * from "./env.js";
+export * from "./ipc.js";
+export * from "./secret-provider.js";
+export * from "./config.js";
+export * from "./deadlines.js";
+export * from "./lifecycle.js";
+export * from "./telemetry.js";

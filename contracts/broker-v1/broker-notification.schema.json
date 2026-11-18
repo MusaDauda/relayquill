@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relayquill.example/contracts/broker-v1/broker-notification.schema.json",
+  "title": "Relayquill JetStream Notification Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "envelope_version",
+    "outbox_id",
+    "event_id",
+    "project_id",
+    "topology_version",
+    "publication_generation",
+    "content_sha256"
+  ],
+  "properties": {
+    "envelope_version": { "const": 1 },
+    "outbox_id": { "$ref": "#/$defs/CanonicalUuid" },
+    "event_id": { "$ref": "#/$defs/CanonicalUuid" },
+    "project_id": { "$ref": "#/$defs/CanonicalUuid" },
+    "topology_version": { "$ref": "#/$defs/PositiveInt64String" },
+    "publication_generation": { "$ref": "#/$defs/PositiveInt64String" },
+    "content_sha256": { "$ref": "#/$defs/Sha256Hex" },
+    "traceparent": {
+      "type": "string",
+      "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$",
+      "not": {
+        "anyOf": [
+          { "pattern": "^00-0{32}-" },
+          { "pattern": "^00-[0-9a-f]{32}-0{16}-" }
+        ]
+      }
+    },
+    "tracestate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  },
+  "$defs": {
+    "CanonicalUuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "PositiveInt64String": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,18}$"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relayquill.example/contracts/webhook-v1/endpoint-verification.schema.json",
+  "title": "Relayquill Endpoint Verification Body v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "envelope_version",
+    "verification_id",
+    "endpoint_id",
+    "endpoint_version",
+    "key_id",
+    "purpose",
+    "public_nonce",
+    "configuration_sha256"
+  ],
+  "properties": {
+    "envelope_version": { "const": 1 },
+    "verification_id": { "$ref": "#/$defs/CanonicalUuid" },
+    "endpoint_id": { "$ref": "#/$defs/CanonicalUuid" },
+    "endpoint_version": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+    "key_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+    "purpose": { "enum": ["verify_destination_and_key", "verify_rotation_key"] },
+    "public_nonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "configuration_sha256": { "$ref": "#/$defs/Sha256Hex" },
+    "receiver_contract_sha256": { "$ref": "#/$defs/Sha256Hex" }
+  },
+  "$defs": {
+    "CanonicalUuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

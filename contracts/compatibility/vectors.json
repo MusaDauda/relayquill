@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "profile": "compatibility",
+  "raw_content_vectors": {
+    "compact_echo_utf8": "{\"message\":\"hello\"}",
+    "compact_echo_sha256": "9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25",
+    "spaced_echo_utf8": "{\"message\": \"hello\"}",
+    "spaced_echo_sha256": "cf8f644b80ee8100db6f910fa33514be8e0ac3d3f54546de914b34c2206ad6a9",
+    "lossless_large_numeric_utf8": "{\"amount\":90071992547409931234567890.123456789,\"currency\":\"USD\"}",
+    "lossless_large_numeric_sha256": "4fa483dbe4f7cccdeb0fb207aa12edd7f69791928a714f9fdc27f698c35372e4"
+  },
+  "timestamp_vectors": {
+    "valid_microsecond_offset": {
+      "input": "2026-11-01T14:00:00.123456+02:00",
+      "expected_canonical": "2026-11-01T12:00:00.123456Z"
+    },
+    "invalid_inputs": [
+      "2026-11-01T12:00:00-00:00",
+      "2026-11-01T12:00:00.1234567Z",
+      "2026-11-01T12:00:60Z",
+      "2026-11-01T12:00:00"
+    ]
+  },
+  "int64_boundary_vectors": {
+    "valid": ["0", "9007199254740993", "9223372036854775807", "-9223372036854775808"],
+    "invalid": ["+1", "01", "-0", "1e5", "9223372036854775808", "-9223372036854775809", "1.5"]
+  },
+  "error_acceptance_vectors": [
+    {
+      "error": {
+        "code": "BUSINESS_IDENTITY_CONFLICT",
+        "message": "Conflicting payload under retained business key",
+        "retryable": false,
+        "acceptance": "known_rejected",
+        "boundary": "accepted"
+      },
+      "meta": {
+        "request_id": "req-compat-001",
+        "response_schema_version": 1,
+        "observed_at": "2026-11-01T12:00:00.123456Z"
+      }
+    },
+    {
+      "error": {
+        "code": "ACCEPTANCE_UNKNOWN",
+        "message": "Storage commit outcome could not be established before deadline",
+        "retryable": true,
+        "acceptance": "unknown",
+        "boundary": "accepted"
+      },
+      "meta": {
+        "request_id": "req-compat-002",
+        "response_schema_version": 1,
+        "observed_at": "2026-11-01T12:00:05.000000Z"
+      }
+    },
+    {
+      "error": {
+        "code": "INVARIANT_VIOLATION",
+        "message": "Internal invariant check failed before mutation",
+        "retryable": false,
+        "acceptance": "not_applicable"
+      },
+      "meta": {
+        "request_id": "req-compat-003",
+        "response_schema_version": 1,
+        "observed_at": "2026-11-01T12:00:06.000000Z"
+      }
+    }
+  ],
+  "unsupported_future_response_vector": {
+    "data": { "status": "ok" },
+    "meta": {
+      "request_id": "req-future-001",
+      "response_schema_version": 99,
+      "observed_at": "2026-11-01T12:00:00.000000Z"
+    }
+  }
+}

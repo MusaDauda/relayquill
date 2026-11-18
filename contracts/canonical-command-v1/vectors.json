@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "profile": "canonical-command-v1",
+  "command_vectors": [
+    {
+      "name": "machine_producer_omitted_options",
+      "input": {
+        "scope": {
+          "tenant_id": "00000000-0000-4000-8000-000000000101",
+          "project_id": "00000000-0000-4000-8000-000000000105",
+          "publication_channel_id": "00000000-0000-4000-8000-000000000405",
+          "channel_kind": "machine_producer",
+          "actor_principal_id": "00000000-0000-4000-8000-000000000505",
+          "producer_namespace": "demo.machine"
+        },
+        "submission": {
+          "business_key": "sample-echo-001",
+          "event_type_id": "00000000-0000-4000-8000-000000000305",
+          "event_schema_version": 1,
+          "content_sha256": "9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25",
+          "byte_count": 19
+        }
+      },
+      "expected_canonical_json": "{\"action\":\"events.admit\",\"hash_schema\":\"relayquill.command.v1\",\"option_presence\":{\"deadline_at\":false,\"producer_event_time\":false},\"scope\":{\"actor_principal_id\":\"00000000-0000-4000-8000-000000000505\",\"channel_kind\":\"machine_producer\",\"producer_namespace\":\"demo.machine\",\"project_id\":\"00000000-0000-4000-8000-000000000105\",\"publication_channel_id\":\"00000000-0000-4000-8000-000000000405\",\"tenant_id\":\"00000000-0000-4000-8000-000000000101\"},\"submission\":{\"business_key\":\"sample-echo-001\",\"byte_count\":19,\"content_sha256\":\"9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25\",\"event_schema_version\":1,\"event_type_id\":\"00000000-0000-4000-8000-000000000305\"}}",
+      "expected_sha256": "5b1636e8bf2df0efff3878f14264906366b204ba84939ea20fa197d5144132df"
+    },
+    {
+      "name": "machine_producer_with_microsecond_event_time_offset_normalized",
+      "input": {
+        "scope": {
+          "tenant_id": "00000000-0000-4000-8000-000000000101",
+          "project_id": "00000000-0000-4000-8000-000000000105",
+          "publication_channel_id": "00000000-0000-4000-8000-000000000405",
+          "channel_kind": "machine_producer",
+          "actor_principal_id": "00000000-0000-4000-8000-000000000505",
+          "producer_namespace": "demo.machine"
+        },
+        "submission": {
+          "business_key": "sample-echo-001",
+          "event_type_id": "00000000-0000-4000-8000-000000000305",
+          "event_schema_version": 1,
+          "content_sha256": "9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25",
+          "byte_count": 19,
+          "producer_event_time": "2026-11-01T13:59:30.123456+02:00"
+        }
+      },
+      "expected_canonical_json": "{\"action\":\"events.admit\",\"hash_schema\":\"relayquill.command.v1\",\"option_presence\":{\"deadline_at\":false,\"producer_event_time\":true},\"scope\":{\"actor_principal_id\":\"00000000-0000-4000-8000-000000000505\",\"channel_kind\":\"machine_producer\",\"producer_namespace\":\"demo.machine\",\"project_id\":\"00000000-0000-4000-8000-000000000105\",\"publication_channel_id\":\"00000000-0000-4000-8000-000000000405\",\"tenant_id\":\"00000000-0000-4000-8000-000000000101\"},\"submission\":{\"business_key\":\"sample-echo-001\",\"byte_count\":19,\"content_sha256\":\"9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25\",\"event_schema_version\":1,\"event_type_id\":\"00000000-0000-4000-8000-000000000305\",\"producer_event_time\":\"2026-11-01T11:59:30.123456Z\"}}",
+      "expected_sha256": "a37675a7d7e8ec8c7156a4f379f93b6fca9a4b0d45d501a6cccb92cc5179f191"
+    },
+    {
+      "name": "human_workflow_omitted_options",
+      "input": {
+        "scope": {
+          "tenant_id": "00000000-0000-4000-8000-000000000101",
+          "project_id": "00000000-0000-4000-8000-000000000105",
+          "publication_channel_id": "00000000-0000-4000-8000-000000000405",
+          "channel_kind": "human_workflow",
+          "actor_principal_id": "00000000-0000-4000-8000-000000000506",
+          "producer_namespace": "human.00000000-0000-4000-8000-000000000506"
+        },
+        "submission": {
+          "business_key": "sample-echo-001",
+          "event_type_id": "00000000-0000-4000-8000-000000000305",
+          "event_schema_version": 1,
+          "content_sha256": "9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25",
+          "byte_count": 19
+        }
+      },
+      "expected_canonical_json": "{\"action\":\"events.admit\",\"hash_schema\":\"relayquill.command.v1\",\"option_presence\":{\"deadline_at\":false,\"producer_event_time\":false},\"scope\":{\"actor_principal_id\":\"00000000-0000-4000-8000-000000000506\",\"channel_kind\":\"human_workflow\",\"producer_namespace\":\"human.00000000-0000-4000-8000-000000000506\",\"project_id\":\"00000000-0000-4000-8000-000000000105\",\"publication_channel_id\":\"00000000-0000-4000-8000-000000000405\",\"tenant_id\":\"00000000-0000-4000-8000-000000000101\"},\"submission\":{\"business_key\":\"sample-echo-001\",\"byte_count\":19,\"content_sha256\":\"9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25\",\"event_schema_version\":1,\"event_type_id\":\"00000000-0000-4000-8000-000000000305\"}}",
+      "expected_sha256": "14c84b3fca2793db430248cb436675d0dadcf21541223dce5b5846585556f982"
+    }
+  ],
+  "effective_vector": {
+    "input": {
+      "submitted_shape_sha256": "5b1636e8bf2df0efff3878f14264906366b204ba84939ea20fa197d5144132df",
+      "admitted_at": "2026-11-01T12:00:00.000000Z",
+      "delivery_deadline_at": "2026-11-02T12:00:00.000000Z",
+      "delivery_window_ms": "86400000",
+      "producer_event_time": null,
+      "option_presence": {
+        "producer_event_time": false,
+        "deadline_at": false
+      },
+      "topology_version": "1",
+      "admission_policy_version": "admission_v1",
+      "retention_policy_version": "retention_v1"
+    },
+    "expected_canonical_json": "{\"accepted_defaults\":{\"admitted_at\":\"2026-11-01T12:00:00.000000Z\",\"delivery_deadline_at\":\"2026-11-02T12:00:00.000000Z\",\"delivery_window_ms\":\"86400000\",\"option_presence\":{\"deadline_at\":false,\"producer_event_time\":false},\"producer_event_time\":null},\"action\":\"events.admit\",\"hash_schema\":\"relayquill.effective.v1\",\"policy_references\":{\"admission_policy_version\":\"admission_v1\",\"hash_schema_version\":1,\"retention_policy_version\":\"retention_v1\",\"topology_version\":\"1\"},\"submitted_shape_sha256\":\"5b1636e8bf2df0efff3878f14264906366b204ba84939ea20fa197d5144132df\"}",
+    "expected_sha256": "e57a0edb4f1492f880ffbae27db9f0b33d8a4839e837339848c4f24ac1d8135b"
+  },
+  "digest_vectors": {
+    "business_key": "sample-echo-001",
+    "business_key_sha256": "f1bf0882b24247f5fe5348da9ad356ed9fee5c0c74d832d1818d206eb4a2dacf",
+    "request_key": "req-sample-001",
+    "request_key_sha256": "8a8f469a607a6eb866c9a68342672f0b4db3e8fec309f956c384a00585361114",
+    "command_guard": {
+      "scope_kind": "project",
+      "tenant_id": "00000000-0000-4000-8000-000000000101",
+      "project_id": "00000000-0000-4000-8000-000000000105",
+      "actor_principal_id": "00000000-0000-4000-8000-000000000505",
+      "command_family": "events.admit",
+      "key_sha256": "8a8f469a607a6eb866c9a68342672f0b4db3e8fec309f956c384a00585361114",
+      "expected_digest_sha256": "9c684a476baed480c63b654d099e4fc8362e3d1f9a24241d68706105bc3eb505",
+      "expected_advisory_lock_key": "-7176404335605132160"
+    },
+    "consumer_event": {
+      "project_id": "00000000-0000-4000-8000-000000000105",
+      "event_id": "00000000-0000-4000-8000-000000000205",
+      "consumer_contract_scope": "demo.counter.v1",
+      "expected_sha256": "f9c822d809959a6a46a21fa90437c31ac3b0e0919d35d379b217db4597288575"
+    },
+    "ordering_key": {
+      "ordering_domain_id": "00000000-0000-4000-8000-000000000905",
+      "subscription_id": "00000000-0000-4000-8000-000000000805",
+      "consumer_contract_scope": "demo.counter.v1",
+      "ordering_key": "acct-\ud83d\ude80-001",
+      "expected_sha256": "22d25f1845610efb7b57682bf9d8c78143b7ad51668c37f9f37403ca96370e5b"
+    },
+    "original_facts": {
+      "project_id": "00000000-0000-4000-8000-000000000105",
+      "event_id": "00000000-0000-4000-8000-000000000205",
+      "project_event_sequence": "1",
+      "event_type_id": "00000000-0000-4000-8000-000000000305",
+      "event_type": "demo.echoed",
+      "event_schema_version": 1,
+      "admitted_at": "2026-11-01T12:00:00.000000Z",
+      "producer_event_time": null,
+      "original_content_sha256": "9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25",
+      "expected_canonical_json": "{\"admitted_at\":\"2026-11-01T12:00:00.000000Z\",\"event_id\":\"00000000-0000-4000-8000-000000000205\",\"event_schema_version\":1,\"event_type\":\"demo.echoed\",\"event_type_id\":\"00000000-0000-4000-8000-000000000305\",\"original_content_sha256\":\"9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25\",\"producer_event_time\":null,\"project_event_sequence\":\"1\",\"project_id\":\"00000000-0000-4000-8000-000000000105\"}",
+      "expected_sha256": "1895c3c26df9bdabecdda6ad5be3747bb52a69f219499e038e1aa8807125fded"
+    }
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relayquill.example/contracts/compatibility/http-envelope-and-states.schema.json",
+  "title": "Relayquill HTTP Response Envelope, Capability, and Content Compatibility Contracts",
+  "oneOf": [
+    { "$ref": "#/$defs/SuccessEnvelope" },
+    { "$ref": "#/$defs/ErrorEnvelope" },
+    { "$ref": "#/$defs/CapabilityEntry" },
+    { "$ref": "#/$defs/ContentAvailabilityMetadata" }
+  ],
+  "$defs": {
+    "CanonicalUuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Int64String": {
+      "type": "string",
+      "pattern": "^(?:0|-?[1-9][0-9]{0,18})$"
+    },
+    "CanonicalUtcTimestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+    },
+    "ResponseMeta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "response_schema_version", "observed_at"],
+      "properties": {
+        "request_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "response_schema_version": { "const": 1 },
+        "observed_at": { "$ref": "#/$defs/CanonicalUtcTimestamp" }
+      }
+    },
+    "SuccessEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "meta"],
+      "properties": {
+        "data": {},
+        "meta": { "$ref": "#/$defs/ResponseMeta" }
+      }
+    },
+    "ErrorEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error", "meta"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "retryable", "acceptance"],
+          "properties": {
+            "code": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+            "message": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "retryable": { "type": "boolean" },
+            "acceptance": { "enum": ["known_rejected", "unknown", "not_applicable"] },
+            "boundary": {
+              "enum": ["accepted", "published", "http_acknowledged", "consumer_processed"]
+            },
+            "field_errors": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "code"],
+                "properties": {
+                  "path": { "type": "string", "minLength": 1, "maxLength": 256 },
+                  "code": { "type": "string", "minLength": 1, "maxLength": 128 }
+                }
+              }
+            },
+            "resource_ref": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "id"],
+              "properties": {
+                "kind": { "type": "string", "minLength": 1, "maxLength": 128 },
+                "id": { "$ref": "#/$defs/CanonicalUuid" }
+              }
+            }
+          }
+        },
+        "meta": { "$ref": "#/$defs/ResponseMeta" }
+      }
+    },
+    "CapabilityEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "target_kind",
+        "target_id",
+        "expected_version",
+        "available",
+        "reason_code",
+        "requires_step_up",
+        "requires_distinct_reviewer"
+      ],
+      "properties": {
+        "action": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "target_kind": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "target_id": { "$ref": "#/$defs/CanonicalUuid" },
+        "expected_version": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/Int64String" }]
+        },
+        "available": { "type": "boolean" },
+        "reason_code": {
+          "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 128 }]
+        },
+        "requires_step_up": { "type": "boolean" },
+        "requires_distinct_reviewer": { "type": "boolean" }
+      }
+    },
+    "ContentAvailabilityMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["view", "availability", "media_type", "byte_count", "sha256"],
+      "properties": {
+        "view": { "enum": ["original", "derived", "wire"] },
+        "availability": {
+          "enum": ["available", "expired", "not_generated", "unsupported", "unavailable"]
+        },
+        "media_type": { "const": "application/json" },
+        "byte_count": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "integer", "minimum": 1, "maximum": 524288 }
+          ]
+        },
+        "sha256": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/Sha256Hex" }]
+        },
+        "representation_version": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "reason_code": {
+          "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 128 }]
+        }
+      }
+    }
+  }
+}

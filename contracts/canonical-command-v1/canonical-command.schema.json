@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relayquill.example/contracts/canonical-command-v1/canonical-command.schema.json",
+  "title": "Relayquill Canonical Command and Effective Fingerprint Profiles v1",
+  "oneOf": [
+    { "$ref": "#/$defs/CanonicalCommandV1" },
+    { "$ref": "#/$defs/CanonicalEffectiveV1" },
+    { "$ref": "#/$defs/OriginalSemanticFactsV1" }
+  ],
+  "$defs": {
+    "CanonicalUuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "PositiveInt64String": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,18}$"
+    },
+    "CanonicalUtcTimestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+    },
+    "OptionPresence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["producer_event_time", "deadline_at"],
+      "properties": {
+        "producer_event_time": { "type": "boolean" },
+        "deadline_at": { "type": "boolean" }
+      }
+    },
+    "CanonicalCommandV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hash_schema", "action", "scope", "submission", "option_presence"],
+      "properties": {
+        "hash_schema": { "const": "relayquill.command.v1" },
+        "action": { "const": "events.admit" },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tenant_id",
+            "project_id",
+            "publication_channel_id",
+            "channel_kind",
+            "actor_principal_id",
+            "producer_namespace"
+          ],
+          "properties": {
+            "tenant_id": { "$ref": "#/$defs/CanonicalUuid" },
+            "project_id": { "$ref": "#/$defs/CanonicalUuid" },
+            "publication_channel_id": { "$ref": "#/$defs/CanonicalUuid" },
+            "channel_kind": { "enum": ["machine_producer", "human_workflow"] },
+            "actor_principal_id": { "$ref": "#/$defs/CanonicalUuid" },
+            "producer_namespace": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        },
+        "submission": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "business_key",
+            "event_type_id",
+            "event_schema_version",
+            "content_sha256",
+            "byte_count"
+          ],
+          "properties": {
+            "business_key": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "event_type_id": { "$ref": "#/$defs/CanonicalUuid" },
+            "event_schema_version": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+            "content_sha256": { "$ref": "#/$defs/Sha256Hex" },
+            "byte_count": { "type": "integer", "minimum": 1, "maximum": 262144 },
+            "producer_event_time": { "$ref": "#/$defs/CanonicalUtcTimestamp" },
+            "deadline_at": { "$ref": "#/$defs/CanonicalUtcTimestamp" }
+          }
+        },
+        "option_presence": { "$ref": "#/$defs/OptionPresence" }
+      }
+    },
+    "CanonicalEffectiveV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hash_schema",
+        "action",
+        "submitted_shape_sha256",
+        "accepted_defaults",
+        "policy_references"
+      ],
+      "properties": {
+        "hash_schema": { "const": "relayquill.effective.v1" },
+        "action": { "const": "events.admit" },
+        "submitted_shape_sha256": { "$ref": "#/$defs/Sha256Hex" },
+        "accepted_defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "admitted_at",
+            "delivery_deadline_at",
+            "delivery_window_ms",
+            "producer_event_time",
+            "option_presence"
+          ],
+          "properties": {
+            "admitted_at": { "$ref": "#/$defs/CanonicalUtcTimestamp" },
+            "delivery_deadline_at": { "$ref": "#/$defs/CanonicalUtcTimestamp" },
+            "delivery_window_ms": { "$ref": "#/$defs/PositiveInt64String" },
+            "producer_event_time": {
+              "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/CanonicalUtcTimestamp" }]
+            },
+            "option_presence": { "$ref": "#/$defs/OptionPresence" }
+          }
+        },
+        "policy_references": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "hash_schema_version",
+            "topology_version",
+            "admission_policy_version",
+            "retention_policy_version"
+          ],
+          "properties": {
+            "hash_schema_version": { "const": 1 },
+            "topology_version": { "$ref": "#/$defs/PositiveInt64String" },
+            "admission_policy_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "retention_policy_version": { "type": "string", "minLength": 1, "maxLength": 128 }
+          }
+        }
+      }
+    },
+    "OriginalSemanticFactsV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project_id",
+        "event_id",
+        "project_event_sequence",
+        "event_type_id",
+        "event_type",
+        "event_schema_version",
+        "admitted_at",
+        "producer_event_time",
+        "original_content_sha256"
+      ],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/CanonicalUuid" },
+        "event_id": { "$ref": "#/$defs/CanonicalUuid" },
+        "project_event_sequence": { "$ref": "#/$defs/PositiveInt64String" },
+        "event_type_id": { "$ref": "#/$defs/CanonicalUuid" },
+        "event_type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*){0,7}$"
+        },
+        "event_schema_version": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "admitted_at": { "$ref": "#/$defs/CanonicalUtcTimestamp" },
+        "producer_event_time": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/CanonicalUtcTimestamp" }]
+        },
+        "original_content_sha256": { "$ref": "#/$defs/Sha256Hex" }
+      }
+    }
+  }
+}

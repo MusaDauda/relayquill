@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "profile": "broker-v1",
+  "stream_name": "RELAYQUILL_EVENTS_V1",
+  "consumer_name": "RELAYQUILL_FANOUT_V1",
+  "max_payload_bytes": 4096,
+  "vectors": [
+    {
+      "name": "minimal_notification",
+      "input": {
+        "envelope_version": 1,
+        "outbox_id": "00000000-0000-4000-8000-000000000605",
+        "event_id": "00000000-0000-4000-8000-000000000205",
+        "project_id": "00000000-0000-4000-8000-000000000105",
+        "topology_version": "1",
+        "publication_generation": "1",
+        "content_sha256": "9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25"
+      },
+      "expected_subject": "rq.events.00000000-0000-4000-8000-000000000105.accepted",
+      "expected_broker_message_id": "rq:00000000-0000-4000-8000-000000000605:1",
+      "expected_json": "{\"content_sha256\":\"9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25\",\"envelope_version\":1,\"event_id\":\"00000000-0000-4000-8000-000000000205\",\"outbox_id\":\"00000000-0000-4000-8000-000000000605\",\"project_id\":\"00000000-0000-4000-8000-000000000105\",\"publication_generation\":\"1\",\"topology_version\":\"1\"}",
+      "expected_byte_count": 311,
+      "expected_envelope_sha256": "d214cf2bc84a0572cb17ce4796470f0626daa93332ca5b6bd5f40c2a8a1d4d9b"
+    },
+    {
+      "name": "recovery_generation_with_trace_context",
+      "input": {
+        "envelope_version": 1,
+        "outbox_id": "00000000-0000-4000-8000-000000000605",
+        "event_id": "00000000-0000-4000-8000-000000000205",
+        "project_id": "00000000-0000-4000-8000-000000000105",
+        "topology_version": "1",
+        "publication_generation": "2",
+        "content_sha256": "9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25",
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rq=v1"
+      },
+      "expected_subject": "rq.events.00000000-0000-4000-8000-000000000105.accepted",
+      "expected_broker_message_id": "rq:00000000-0000-4000-8000-000000000605:2",
+      "expected_json": "{\"content_sha256\":\"9b2d43affbf49a367028df2e1414f84c0e099ac98c3d54a8a80157fd7771af25\",\"envelope_version\":1,\"event_id\":\"00000000-0000-4000-8000-000000000205\",\"outbox_id\":\"00000000-0000-4000-8000-000000000605\",\"project_id\":\"00000000-0000-4000-8000-000000000105\",\"publication_generation\":\"2\",\"topology_version\":\"1\",\"traceparent\":\"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01\",\"tracestate\":\"rq=v1\"}",
+      "expected_byte_count": 404,
+      "expected_envelope_sha256": "0c755f14cc1e9291660904e147e5feda8548908bd3368c5091112af9af4a1662"
+    }
+  ]
+}

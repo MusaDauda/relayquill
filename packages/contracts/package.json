@@ -8,6 +8,26 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./http": {
+      "types": "./dist/http/index.d.ts",
+      "import": "./dist/http/index.js",
+      "default": "./dist/http/index.js"
+    },
+    "./canonical-command": {
+      "types": "./dist/canonical-command.d.ts",
+      "import": "./dist/canonical-command.js",
+      "default": "./dist/canonical-command.js"
+    },
+    "./webhook": {
+      "types": "./dist/webhook.d.ts",
+      "import": "./dist/webhook.js",
+      "default": "./dist/webhook.js"
+    },
+    "./broker": {
+      "types": "./dist/broker.d.ts",
+      "import": "./dist/broker.js",
+      "default": "./dist/broker.js"
     }
   },
   "types": "./dist/index.d.ts",

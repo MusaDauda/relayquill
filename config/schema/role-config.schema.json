@@ -61,6 +61,126 @@
       }
     },
     {
+      "if": { "properties": { "profile": { "const": "portable_pglite" } }, "required": ["profile"] },
+      "then": {
+        "properties": {
+          "database": {
+            "properties": {
+              "mode": { "const": "portable_pglite" }
+            }
+          },
+          "broker": {
+            "properties": {
+              "mode": { "enum": ["in_memory_test", "embedded_go_tls"] }
+            }
+          },
+          "secret_provider": {
+            "properties": {
+              "mode": { "const": "in_memory_test" }
+            }
+          },
+          "auth": {
+            "properties": {
+              "cookie_profile": { "const": "development_only" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "profile": { "const": "development_trusted_local" } }, "required": ["profile"] },
+      "then": {
+        "properties": {
+          "database": {
+            "properties": {
+              "mode": { "const": "development_trusted_local" }
+            }
+          },
+          "broker": {
+            "properties": {
+              "mode": { "enum": ["embedded_go_tls", "development_loopback"] }
+            }
+          },
+          "secret_provider": {
+            "properties": {
+              "mode": { "const": "local_ipc_provider" }
+            }
+          },
+          "auth": {
+            "properties": {
+              "cookie_profile": { "const": "development_only" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "profile": { "const": "hosted_neon" } }, "required": ["profile"] },
+      "then": {
+        "properties": {
+          "database": {
+            "properties": {
+              "mode": { "const": "hosted_neon" }
+            }
+          },
+          "broker": {
+            "properties": {
+              "mode": { "const": "hosted_synadia_ngs" }
+            }
+          },
+          "auth": {
+            "properties": {
+              "cookie_profile": { "const": "release_https" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "profile": { "const": "hosted_supabase" } }, "required": ["profile"] },
+      "then": {
+        "properties": {
+          "database": {
+            "properties": {
+              "mode": { "const": "hosted_supabase" }
+            }
+          },
+          "broker": {
+            "properties": {
+              "mode": { "const": "hosted_synadia_ngs" }
+            }
+          },
+          "auth": {
+            "properties": {
+              "cookie_profile": { "const": "release_https" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "profile": { "const": "hosted_synadia_ngs" } }, "required": ["profile"] },
+      "then": {
+        "properties": {
+          "broker": {
+            "properties": {
+              "mode": { "const": "hosted_synadia_ngs" }
+            }
+          },
+          "database": {
+            "properties": {
+              "mode": { "enum": ["hosted_neon", "hosted_supabase"] }
+            }
+          },
+          "auth": {
+            "properties": {
+              "cookie_profile": { "const": "release_https" }
+            }
+          }
+        }
+      }
+    },
+    {
       "oneOf": [
         {
           "description": "API server role",
@@ -355,7 +475,17 @@
                 "target_schema_revision": { "type": "string", "minLength": 1, "maxLength": 64 }
               }
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "command_role": { "const": "recovery_operator" } }, "required": ["command_role"] },
+              "then": { "properties": { "recovery": { "properties": { "actor_role": { "const": "operator" } } } } }
+            },
+            {
+              "if": { "properties": { "command_role": { "const": "recovery_reviewer" } }, "required": ["command_role"] },
+              "then": { "properties": { "recovery": { "properties": { "actor_role": { "const": "reviewer" } } } } }
+            }
+          ]
         },
         {
           "description": "Admin diagnostics operator role",

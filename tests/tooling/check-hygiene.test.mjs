@@ -56,17 +56,21 @@ test("gitignore exempts only the exact exclusion line and flags forbidden commen
   const findings = scanTextForHygiene(text, { filePath: ".gitignore" });
   assert.equal(findings.length, 1);
   assert.equal(findings[0].line, 2);
-  assert.equal(findings[0].rule, "handbook_ref");
+  assert.equal(findings[0].rule, "spec_doc_ref");
 });
 
-test("rejects forbidden terms, chapter citations, trailers, and AI attribution", () => {
+test("rejects forbidden terms, section citations, trailers, snake_case identifiers, and AI attribution", () => {
   const cases = [
     ["Day", " 05"].join(""),
     ["Day", "-05"].join(""),
+    ["day", "05", "_ref"].join(""),
     ["hand", "book"].join(""),
+    ["my_", "hand", "book_notes"].join(""),
     ["blue", "print"].join(""),
+    ["blue", "print_v1"].join(""),
     ["chap", "ter 20"].join(""),
     ["ch", ".70"].join(""),
+    ["ch", " 71"].join(""),
     ["Co", "Authored", "By: Bot"].join("-"),
     ["Cl", "aude"].join("")
   ];
@@ -77,15 +81,15 @@ test("rejects forbidden terms, chapter citations, trailers, and AI attribution",
   }
 });
 
-test("does not false-positive on CSS 40ch or words like channel", () => {
+test("does not false-positive on CSS 40ch, channel, or neutral rule identifiers", () => {
   const findings = scanTextForHygiene(
-    "const style = { maxWidth: '40ch' }; const channel = 'provider';\n",
+    "const style = { maxWidth: '40ch', width: '40ch;' }; const channel = 'provider'; const rules = ['spec_day_ref', 'spec_doc_ref', 'spec_plan_ref', 'section_num_ref'];\n",
     { filePath: "src/styles.ts" }
   );
   assert.equal(findings.length, 0);
 });
 
-test("rejects config files containing user paths, .sock paths, or raw secret keys", () => {
+test("rejects config files containing user paths (including lowercase Windows), .sock paths, or compound raw secret keys", () => {
   const homePath = `/${["ho", "me"].join("")}/dev/app.sock`;
   const findings1 = scanTextForHygiene(
     JSON.stringify({ ipc_path: homePath }),
@@ -94,12 +98,41 @@ test("rejects config files containing user paths, .sock paths, or raw secret key
   assert.ok(findings1.some((f) => f.rule === "config_hardcoded_user_path"));
   assert.ok(findings1.some((f) => f.rule === "config_hardcoded_sock_path"));
 
+  const winLowerPath = `c:\\${["us", "ers"].join("")}\\alice\\app`;
+  const findingsWinJson = scanTextForHygiene(
+    JSON.stringify({ cache_dir: winLowerPath }),
+    { filePath: "config/development.api.json" }
+  );
+  assert.ok(findingsWinJson.some((f) => f.rule === "config_hardcoded_user_path"));
+
+  const findingsWinRaw = scanTextForHygiene(
+    `cache_dir = "${winLowerPath}"\n`,
+    { filePath: "config/release.backend.hcl" }
+  );
+  assert.ok(findingsWinRaw.some((f) => f.rule === "config_hardcoded_user_path"));
+
   const rawPassKey = ["pass", "word"].join("");
+  const compoundDbPass = ["db_", "pass", "word"].join("");
+  const compoundClientSec = ["client_", "sec", "ret"].join("");
+  const compoundBearerTok = ["bearer_", "tok", "en"].join("");
   const findings2 = scanTextForHygiene(
-    JSON.stringify({ database: { [rawPassKey]: "not-allowed" } }),
+    JSON.stringify({
+      database: { [rawPassKey]: "not-allowed", [compoundDbPass]: "nope", password_secret_ref: "env:DB_PASS" },
+      auth: { [compoundClientSec]: "nope", [compoundBearerTok]: "nope", secret_ref: "env:AUTH_SEC" }
+    }),
     { filePath: "config/hosted.neon.api.json" }
   );
-  assert.ok(findings2.some((f) => f.rule === "config_raw_secret_key"));
+  const secretKeyFindings = findings2.filter((f) => f.rule === "config_raw_secret_key");
+  assert.equal(secretKeyFindings.length, 4);
+
+  const cleanConfigFindings = scanTextForHygiene(
+    JSON.stringify({
+      secret_provider: { mode: "aws_secrets_manager", secret_prefix: "/rq/prod" },
+      database: { password_secret_ref: "env:DB_PASS" }
+    }),
+    { filePath: "config/release.api.json" }
+  );
+  assert.equal(cleanConfigFindings.length, 0);
 });
 
 test("detects forbidden terms in historical non-HEAD git commits", (t) => {
@@ -116,7 +149,33 @@ test("detects forbidden terms in historical non-HEAD git commits", (t) => {
 
   const history = checkCommitHistory(dir);
   assert.equal(history.commitsScanned, 2);
-  assert.ok(history.violations.some((v) => v.rule === "co_authored_by"));
+  assert.ok(history.violations.some((v) => v.rule === "attribution_trailer"));
+});
+
+test("rejects tracked file paths with forbidden terms even when file contents are clean", (t) => {
+  const dir = createTempGitRepo(t);
+  fs.writeFileSync(path.join(dir, ".gitignore"), `/${SPEC_DIR}/\n`, "utf8");
+  fs.writeFileSync(path.join(dir, ".dockerignore"), `/${SPEC_DIR}/\n`, "utf8");
+  const badDocPath = path.join(
+    dir,
+    "docs",
+    `${["day", "05"].join("")}-${["hand", "book"].join("")}-${["chap", "ter70"].join("")}.md`
+  );
+  const badSrcPath = path.join(dir, "src", `${["cl", "aude"].join("")}-helper.ts`);
+  fs.mkdirSync(path.dirname(badDocPath), { recursive: true });
+  fs.mkdirSync(path.dirname(badSrcPath), { recursive: true });
+  fs.writeFileSync(badDocPath, "# Clean Notes\nNothing forbidden in body.\n", "utf8");
+  fs.writeFileSync(badSrcPath, "export const ok = true;\n", "utf8");
+
+  git(dir, ["add", "."]);
+  git(dir, ["commit", "-m", "chore: add files"]);
+
+  const report = checkRepoHygiene(dir);
+  assert.equal(report.ok, false);
+  assert.ok(report.violations.some((v) => v.type === "path_hygiene" && v.rule === "spec_day_ref"));
+  assert.ok(report.violations.some((v) => v.type === "path_hygiene" && v.rule === "spec_doc_ref"));
+  assert.ok(report.violations.some((v) => v.type === "path_hygiene" && v.rule === "section_num_ref"));
+  assert.ok(report.violations.some((v) => v.type === "path_hygiene" && v.rule === "ai_attribution"));
 });
 
 test("handles unborn repository with zero commits gracefully", (t) => {

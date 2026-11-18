@@ -10,7 +10,7 @@ const HAND_BOOK = ["hand", "book"].join("");
 const BLUE_PRINT = ["blue", "print"].join("");
 const CHAP_TER = ["chap", "ter"].join("");
 const CH_PREFIX = ["c", "h"].join("");
-const CO_AUTHORED = ["co", "authored", "by"].join("-");
+const ATTRIBUTION_TRAILER_PARTS = ["co", "authored", "by"];
 
 const AI_BRANDS = [
   ["cl", "aude"].join(""),
@@ -25,7 +25,7 @@ const AI_BRANDS = [
 
 const HOME_PREFIX = `/${["ho", "me"].join("")}/`;
 const USERS_PREFIX = `/${["Us", "ers"].join("")}/`;
-const WIN_USERS_PREFIX = `${["C:", "Us", "ers"].join("\\")}\\`;
+const WIN_USERS_PATH_REGEX = new RegExp(`[a-z]:[/\\\\]+${["us", "ers"].join("")}[/\\\\]+`, "i");
 const SOCK_SUFFIX = [".so", "ck"].join("");
 const PEM_HEADER = ["-----BEG", "IN "].join("");
 const PROD_CRED_PREFIX = ["rq_", "p1."].join("");
@@ -52,57 +52,56 @@ const BINARY_EXTENSIONS = new Set([
 
 const HYGIENE_RULES = [
   {
-    id: "day05_ref",
-    regex: new RegExp(`\\b${DAY_WORD}[\\s_-]*0?5\\b|${DAY_WORD}[\\s_-]*0?5[\\s_-]*relayquill`, "i"),
+    id: "spec_day_ref",
+    regex: new RegExp(`(?:^|[^a-z])${DAY_WORD}[\\s_-]*0?5(?![0-9])`, "i"),
     message: "Forbidden reference to external specification numbering"
   },
   {
-    id: "handbook_ref",
-    regex: new RegExp(`\\b${HAND_BOOK}s?\\b`, "i"),
+    id: "spec_doc_ref",
+    regex: new RegExp(`${HAND_BOOK}`, "i"),
     message: "Forbidden specification artifact noun"
   },
   {
-    id: "blueprint_ref",
-    regex: new RegExp(`\\b${BLUE_PRINT}s?\\b`, "i"),
+    id: "spec_plan_ref",
+    regex: new RegExp(`${BLUE_PRINT}`, "i"),
     message: "Forbidden specification artifact noun"
   },
   {
-    id: "chapter_ref",
+    id: "section_num_ref",
     regex: new RegExp(
-      `\\b(?:${CHAP_TER}s?\\s*[:.#-]?\\s*\\d{1,3}|${CH_PREFIX}\\.\\s*\\d{1,3}|${CH_PREFIX}\\s*[:#-]\\s*\\d{1,3}|${CH_PREFIX}\\d{1,3})\\b|\\b${CHAP_TER}s?[/\\\\]\\d{2}-`,
+      `(?:^|[^a-z])${CHAP_TER}s?(?:[\\s_.:#-]*\\d{1,3}(?![0-9])|[/\\\\]\\d{2}-)|(?:^|[^a-z0-9])${CH_PREFIX}(?:_|\\s*[.:#-]?\\s*|\\s+)\\d{1,3}(?=$|[^a-z0-9])`,
       "i"
     ),
-    message: "Forbidden chapter number citation"
+    message: "Forbidden section number citation"
   },
   {
-    id: "co_authored_by",
-    regex: new RegExp(`\\b${CO_AUTHORED}\\b`, "i"),
-    message: "Forbidden Co-Authored trailer"
+    id: "attribution_trailer",
+    regex: new RegExp(`(?:^|[^a-z])${ATTRIBUTION_TRAILER_PARTS.join("[\\s_-]*")}(?=$|[^a-z])`, "i"),
+    message: "Forbidden attribution trailer"
   },
   {
     id: "ai_attribution",
     regex: new RegExp(
-      `\\b(?:${AI_BRANDS.join("|")})\\b|\\b(?:llm[\\s_-]*(?:generated|authored|assistant)|(?:generated|written|authored|created)\\s+by\\s+(?:ai|an?\\s+llm))\\b`,
+      `(?:^|[^a-z])(?:${AI_BRANDS.join("|")})(?=$|[^a-z])|(?:^|[^a-z])(?:llm[\\s_-]*(?:generated|authored|assistant)|(?:generated|written|authored|created)\\s+by\\s+(?:ai|an?\\s+llm))(?=$|[^a-z])`,
       "i"
     ),
     message: "Forbidden AI tooling attribution"
   }
 ];
 
-const FORBIDDEN_SECRET_JSON_KEY = new RegExp(
-  `^(${[
-    ["pass", "word"].join(""),
-    ["pa", "ss"].join(""),
-    ["sec", "ret"].join(""),
-    ["private", "key"].join("_"),
-    ["nkey", "seed"].join("_"),
-    ["cre", "ds"].join(""),
-    ["api", "key"].join("_"),
-    ["signing", "key"].join("_"),
-    ["tok", "en"].join("")
-  ].join("|")})$`,
-  "i"
-);
+const SECRET_KEY_SUFFIXES = [
+  ["pass", "word"].join(""),
+  ["pa", "ss"].join(""),
+  ["sec", "ret"].join(""),
+  ["private", "key"].join("_"),
+  ["nkey", "seed"].join("_"),
+  ["cre", "ds"].join(""),
+  ["api", "key"].join("_"),
+  ["signing", "key"].join("_"),
+  ["tok", "en"].join("")
+].join("|");
+
+const FORBIDDEN_SECRET_JSON_KEY = new RegExp(`(?:^|[_-])(?:${SECRET_KEY_SUFFIXES})$`, "i");
 
 const ALLOWED_EXCLUSION_LINE_REGEX = new RegExp(`^/?${SPEC_DIR_NAME}/?$`);
 const TRACKED_SPEC_DIR_REGEX = new RegExp(`^${SPEC_DIR_NAME}(?:/|$)`);
@@ -165,7 +164,7 @@ function scanConfigSpecificLines(text, relPath) {
     if (
       line.includes(HOME_PREFIX) ||
       line.includes(USERS_PREFIX) ||
-      line.includes(WIN_USERS_PREFIX)
+      WIN_USERS_PATH_REGEX.test(line)
     ) {
       findings.push({
         rule: "config_hardcoded_user_path",
@@ -348,6 +347,16 @@ export function checkTrackedFiles(rootDir, options = {}) {
     const relPath = normalizeRelPath(rawPath);
     if (TRACKED_SPEC_DIR_REGEX.test(relPath)) {
       continue;
+    }
+    const pathFindings = scanTextForHygiene(relPath, { filePath: "", allowIgnoreEntry: false });
+    for (const f of pathFindings) {
+      violations.push({
+        type: "path_hygiene",
+        file: relPath,
+        line: 1,
+        rule: f.rule,
+        message: `${f.message} (in file path)`
+      });
     }
     const bytes = readRepoFileBytes(resolvedRoot, relPath, hasHead);
     if (!bytes || isLikelyBinary(relPath, bytes)) {

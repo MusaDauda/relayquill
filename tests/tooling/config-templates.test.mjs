@@ -242,4 +242,29 @@ test("role-config schema rejects privilege/role leaks and insecure release or ho
   const badSupabase = loadJson(path.join(CONFIG_DIR, "hosted.supabase.api.json"));
   badSupabase.database.isolation = "separate_databases";
   assert.ok(validateAgainstSchema(badSupabase, roleSchema, roleSchema, roleSchemaPath, schemasByFile).length > 0);
+
+  // 5. Profile-to-backing invariant: hosted_neon with development_trusted_local database
+  const neonWithLocalDb = loadJson(path.join(CONFIG_DIR, "hosted.neon.api.json"));
+  neonWithLocalDb.database = loadJson(path.join(CONFIG_DIR, "development.api.json")).database;
+  assert.ok(validateAgainstSchema(neonWithLocalDb, roleSchema, roleSchema, roleSchemaPath, schemasByFile).length > 0);
+
+  // 6. Profile-to-backing invariant: hosted_supabase with portable_pglite database
+  const supabaseWithPglite = loadJson(path.join(CONFIG_DIR, "hosted.supabase.api.json"));
+  supabaseWithPglite.database = loadJson(path.join(CONFIG_DIR, "portable.api.json")).database;
+  assert.ok(validateAgainstSchema(supabaseWithPglite, roleSchema, roleSchema, roleSchemaPath, schemasByFile).length > 0);
+
+  // 7. Profile-to-backing invariant: portable_pglite with hosted_neon database
+  const portableWithNeon = loadJson(path.join(CONFIG_DIR, "portable.api.json"));
+  portableWithNeon.database = loadJson(path.join(CONFIG_DIR, "hosted.neon.api.json")).database;
+  assert.ok(validateAgainstSchema(portableWithNeon, roleSchema, roleSchema, roleSchemaPath, schemasByFile).length > 0);
+
+  // 8. Profile-to-backing invariant: hosted_synadia_ngs with development_loopback broker
+  const synadiaWithLoopback = loadJson(path.join(CONFIG_DIR, "hosted.synadia.relay.json"));
+  synadiaWithLoopback.broker = loadJson(path.join(CONFIG_DIR, "development.relay.json")).broker;
+  assert.ok(validateAgainstSchema(synadiaWithLoopback, roleSchema, roleSchema, roleSchemaPath, schemasByFile).length > 0);
+
+  // 9. Recovery command_role coupled to recovery.actor_role
+  const mismatchedRecovery = loadJson(path.join(CONFIG_DIR, "recovery.operator.json"));
+  mismatchedRecovery.recovery.actor_role = "reviewer";
+  assert.ok(validateAgainstSchema(mismatchedRecovery, roleSchema, roleSchema, roleSchemaPath, schemasByFile).length > 0);
 });

@@ -166,3 +166,49 @@ test("enforces downstream layer policies for console, producer-sdk, receiver-sdk
   assert.ok(report.violations.some((v) => v.workspace === "@relayquill/receiver-sdk" && v.specifier === "pg"));
   assert.ok(report.violations.some((v) => v.workspace === "@relayquill/application" && v.specifier === "@relayquill/postgres"));
 });
+
+test("detects tsconfig.json file-path reference cycles", (t) => {
+  const dir = createTempWorkspace(t, {
+    "packages/domain/package.json": JSON.stringify({ name: "@relayquill/domain" }),
+    "packages/domain/tsconfig.json": JSON.stringify({
+      references: [{ path: "../contracts/tsconfig.json" }]
+    }),
+    "packages/domain/src/index.ts": "export const a = 1;\n",
+    "packages/contracts/package.json": JSON.stringify({
+      name: "@relayquill/contracts",
+      dependencies: { "@relayquill/domain": "0.1.0" }
+    }),
+    "packages/contracts/tsconfig.json": JSON.stringify({
+      references: [{ path: "../domain/tsconfig.json" }]
+    }),
+    "packages/contracts/src/index.ts": "export const b = 2;\n"
+  });
+
+  const report = verifyWorkspaceBoundaries(dir);
+  assert.equal(report.ok, false);
+  assert.ok(report.violations.some((v) => v.type === "cycle"));
+});
+
+test("catches process.getBuiltinModule and require.resolve bypasses", (t) => {
+  const dir = createTempWorkspace(t, {
+    "packages/domain/package.json": JSON.stringify({ name: "@relayquill/domain" }),
+    "packages/domain/src/index.ts":
+      "const fsMod = process.getBuiltinModule('fs'); const pgPath = require.resolve('pg'); export { fsMod, pgPath };\n"
+  });
+
+  const report = verifyWorkspaceBoundaries(dir);
+  assert.equal(report.ok, false);
+  assert.ok(report.violations.some((v) => v.workspace === "@relayquill/domain" && v.specifier === "fs"));
+  assert.ok(report.violations.some((v) => v.workspace === "@relayquill/domain" && v.specifier === "pg"));
+});
+
+test("fails closed with missing_policy for unlisted workspaces", (t) => {
+  const dir = createTempWorkspace(t, {
+    "packages/unregistered/package.json": JSON.stringify({ name: "@relayquill/unregistered" }),
+    "packages/unregistered/src/index.ts": "export const x = 1;\n"
+  });
+
+  const report = verifyWorkspaceBoundaries(dir);
+  assert.equal(report.ok, false);
+  assert.ok(report.violations.some((v) => v.type === "missing_policy" && v.workspace === "@relayquill/unregistered"));
+});

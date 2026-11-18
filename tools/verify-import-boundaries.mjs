@@ -372,6 +372,25 @@ export function extractModuleSpecifiers(filePath, content) {
         ts.isStringLiteralLike(firstArg)
       ) {
         record(firstArg.text, node, "require");
+      } else if (
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.name) &&
+        firstArg &&
+        ts.isStringLiteralLike(firstArg)
+      ) {
+        const propName = node.expression.name.text;
+        const targetExpr = node.expression.expression;
+        if (
+          propName === "getBuiltinModule" &&
+          ((ts.isIdentifier(targetExpr) && targetExpr.text === "process") ||
+            (ts.isPropertyAccessExpression(targetExpr) &&
+              ts.isIdentifier(targetExpr.name) &&
+              targetExpr.name.text === "process"))
+        ) {
+          record(firstArg.text, node, "get_builtin_module");
+        } else if (propName === "resolve" && ts.isIdentifier(targetExpr) && targetExpr.text === "require") {
+          record(firstArg.text, node, "require_resolve");
+        }
       }
     }
     ts.forEachChild(node, visit);
@@ -514,7 +533,10 @@ function readTsConfigReferences(ws, byDirPath) {
   const refs = [];
   for (const ref of parsed.config.references) {
     if (ref && typeof ref.path === "string") {
-      const targetDir = path.resolve(ws.dirPath, ref.path);
+      const targetPath = path.resolve(ws.dirPath, ref.path);
+      const targetDir = targetPath.toLowerCase().endsWith(".json")
+        ? path.dirname(targetPath)
+        : targetPath;
       const targetWs = byDirPath.get(targetDir);
       if (targetWs) {
         refs.push(targetWs.name);
@@ -569,6 +591,17 @@ export function verifyWorkspaceBoundaries(rootDir) {
   for (const ws of workspaces) {
     const policy = WORKSPACE_POLICIES[ws.name];
     const pkgJsonRel = `${ws.relPath}/package.json`;
+
+    if (!policy) {
+      violations.push({
+        type: "missing_policy",
+        workspace: ws.name,
+        file: pkgJsonRel,
+        line: 1,
+        specifier: ws.name,
+        message: `Workspace "${ws.name}" is not registered in WORKSPACE_POLICIES`
+      });
+    }
 
     // 1. Check package.json dependencies
     const depSections = ["dependencies", "peerDependencies", "optionalDependencies", "devDependencies"];

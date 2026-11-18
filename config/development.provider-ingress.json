@@ -1,0 +1,48 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "provider_ingress",
+  "http": {
+    "host": "127.0.0.1",
+    "port": 19096
+  },
+  "database": {
+    "mode": "development_trusted_local",
+    "isolation": "separate_databases",
+    "host": "127.0.0.1",
+    "port": 55005,
+    "name": "relayquill_provider",
+    "schema": "pi",
+    "support_schema": "rq_support",
+    "role": "provider_runtime",
+    "authentication": "trusted_local_only",
+    "tls_mode": "disabled_fixture",
+    "pool_mode": "direct",
+    "maximum_connections": 4,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "secret_provider": {
+    "mode": "local_ipc_provider",
+    "ipc": {
+      "env_name": "dev",
+      "channel": "provider"
+    }
+  },
+  "relayquill_api": {
+    "origin": "http://127.0.0.1:8005",
+    "project_id": "00000000-0000-4000-8000-000000000001",
+    "credential_secret_ref": "custody:provider-ingress/producer-credential"
+  },
+  "control_channel": {
+    "env_name": "dev",
+    "channel": "provider-ingress-control"
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

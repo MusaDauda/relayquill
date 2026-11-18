@@ -1,0 +1,16 @@
+{
+  "$schema": "./schema/operations-config.schema.json",
+  "schema_version": 1,
+  "kind": "load_observer",
+  "api_origin": "http://127.0.0.1:8005",
+  "operator_channel": {
+    "env_name": "dev",
+    "channel": "api-admin"
+  },
+  "poll_interval_ms": 1000,
+  "thresholds": {
+    "max_p95_admission_ms": 250,
+    "max_outbox_lag_ms": 5000,
+    "max_error_rate": 0.01
+  }
+}

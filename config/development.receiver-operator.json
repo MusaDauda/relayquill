@@ -1,0 +1,10 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "receiver_operator",
+  "control_channel": {
+    "env_name": "dev",
+    "channel": "receiver-control"
+  }
+}

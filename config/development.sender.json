@@ -1,0 +1,49 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "sender",
+  "database": {
+    "mode": "development_trusted_local",
+    "isolation": "separate_databases",
+    "host": "127.0.0.1",
+    "port": 55005,
+    "name": "relayquill",
+    "schema": "rq",
+    "support_schema": "rq_support",
+    "role": "rq_sender",
+    "authentication": "trusted_local_only",
+    "tls_mode": "disabled_fixture",
+    "pool_mode": "direct",
+    "maximum_connections": 4,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "secret_provider": {
+    "mode": "local_ipc_provider",
+    "ipc": {
+      "env_name": "dev",
+      "channel": "provider"
+    }
+  },
+  "sender": {
+    "dispatch_domain": "primary",
+    "approved_slots": 8,
+    "poll_interval_ms": 250,
+    "request_timeout_ms": 5000,
+    "max_response_bytes": 65536
+  },
+  "egress": {
+    "mode": "trusted_local_fixture",
+    "allow_fixture_receiver": true,
+    "fixture_receiver_authority": "receiver.fixture.test:19095",
+    "fixture_receiver_path": "/hooks/relayquill",
+    "fixture_resolve_ip": "127.0.0.1"
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

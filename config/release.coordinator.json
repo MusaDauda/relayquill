@@ -1,0 +1,35 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "release",
+  "process_role": "coordinator",
+  "database": {
+    "mode": "release_rds_iam",
+    "isolation": "separate_databases",
+    "host": "relayquill-pg.example.us-east-1.rds.amazonaws.com",
+    "port": 5432,
+    "name": "relayquill",
+    "schema": "rq",
+    "support_schema": "rq_support",
+    "role": "rq_coordinator",
+    "authentication": "aws_rds_iam_token",
+    "tls_mode": "verify_full",
+    "tls_ca_file": "/etc/relayquill/certs/aws-rds-global-bundle.pem",
+    "pool_mode": "direct",
+    "maximum_connections": 4,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "coordinator": {
+    "loop_interval_ms": 1000,
+    "reaper_batch_size": 100,
+    "retention_batch_size": 100,
+    "projection_batch_size": 100
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "admin",
+  "command_role": "bootstrap_operator",
+  "operator_channel": {
+    "env_name": "dev",
+    "channel": "api-admin"
+  }
+}

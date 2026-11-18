@@ -1,0 +1,15 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "provider_ingress_fixture",
+  "http_target": {
+    "base_url": "http://127.0.0.1:19096",
+    "stripe_path": "/webhooks/stripe",
+    "paystack_path": "/webhooks/paystack"
+  },
+  "control_channel": {
+    "env_name": "dev",
+    "channel": "provider-ingress-control"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "portable_pglite",
+  "process_role": "admin",
+  "command_role": "db_and_broker_admin",
+  "database": {
+    "mode": "portable_pglite",
+    "isolation": "separate_databases",
+    "host": "in-memory",
+    "port": 0,
+    "name": "relayquill",
+    "schema": "rq",
+    "support_schema": "rq_support",
+    "role": "rq_migrator",
+    "authentication": "in_process_pglite",
+    "tls_mode": "in_process",
+    "pool_mode": "direct",
+    "maximum_connections": 1,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "broker": {
+    "mode": "in_memory_test",
+    "servers": ["in-memory"],
+    "auth_mode": "none_fixture",
+    "stream_name": "RELAYQUILL_EVENTS_V1",
+    "subject_prefix": "",
+    "consumer_name": "RELAYQUILL_FANOUT_V1",
+    "replicas": 1,
+    "max_msgs": 100000,
+    "max_bytes": 268435456,
+    "max_msg_size": 4096,
+    "max_age_ns": 3600000000000,
+    "duplicate_window_ns": 120000000000,
+    "inbox_prefix": "_INBOX.rq.admin"
+  },
+  "migrations_dir": "migrations",
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

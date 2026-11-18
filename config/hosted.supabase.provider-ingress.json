@@ -1,0 +1,43 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "hosted_supabase",
+  "process_role": "provider_ingress",
+  "http": {
+    "host": "127.0.0.1",
+    "port": 19096,
+    "trust_proxy": true
+  },
+  "database": {
+    "mode": "hosted_supabase",
+    "isolation": "shared_database_schemas",
+    "host": "aws-0-us-east-1.pooler.supabase.com",
+    "port": 5432,
+    "name": "postgres",
+    "schema": "pi",
+    "support_schema": "extensions",
+    "role": "provider_runtime",
+    "authentication": "secret_provider_password",
+    "password_secret_ref": "env:RELAYQUILL_SUPABASE_PASSWORD_PI_RUNTIME",
+    "tls_mode": "verify_full",
+    "tls_ca_file": "certs/supabase-prod-ca-2021.crt",
+    "pool_mode": "session_pooler",
+    "maximum_connections": 4,
+    "connection_timeout_ms": 10000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "secret_provider": {
+    "mode": "env_reference"
+  },
+  "relayquill_api": {
+    "origin": "https://api.relayquill.example",
+    "project_id": "00000000-0000-4000-8000-000000000001",
+    "credential_secret_ref": "env:RELAYQUILL_PRODUCER_CREDENTIAL"
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relayquill.example/schemas/deployment-profile.schema.json",
+  "title": "Relayquill Release Deployment Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "deployment_name",
+    "region",
+    "cpu_platform",
+    "dns_names",
+    "roles",
+    "resource_tags",
+    "artifact_repositories",
+    "infrastructure_root",
+    "backend_config_path",
+    "configuration_paths",
+    "expected_schema_revision",
+    "release_record_directory",
+    "expected_identity_reference"
+  ],
+  "properties": {
+    "$schema": { "type": "string", "minLength": 1 },
+    "profile_version": { "type": "integer", "const": 1 },
+    "deployment_name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}$" },
+    "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z-]+-[0-9]+$" },
+    "cpu_platform": { "type": "string", "enum": ["linux/amd64", "linux/arm64"] },
+    "dns_names": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["console_origin", "api_origin"],
+      "properties": {
+        "console_origin": { "type": "string", "pattern": "^https://" },
+        "api_origin": { "type": "string", "pattern": "^https://" }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "string",
+        "enum": ["api", "relay", "fanout", "sender", "coordinator", "admin", "console", "broker"]
+      }
+    },
+    "resource_tags": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 128 }
+    },
+    "artifact_repositories": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_services", "console", "broker_launcher"],
+      "properties": {
+        "node_services": { "type": "string", "minLength": 1 },
+        "console": { "type": "string", "minLength": 1 },
+        "broker_launcher": { "type": "string", "minLength": 1 }
+      }
+    },
+    "infrastructure_root": { "type": "string", "minLength": 1 },
+    "backend_config_path": { "type": "string", "minLength": 1 },
+    "configuration_paths": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "expected_schema_revision": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "release_record_directory": { "type": "string", "minLength": 1 },
+    "expected_identity_reference": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "portable_pglite",
+  "process_role": "sender",
+  "database": {
+    "mode": "portable_pglite",
+    "isolation": "separate_databases",
+    "host": "in-memory",
+    "port": 0,
+    "name": "relayquill",
+    "schema": "rq",
+    "support_schema": "rq_support",
+    "role": "rq_sender",
+    "authentication": "in_process_pglite",
+    "tls_mode": "in_process",
+    "pool_mode": "direct",
+    "maximum_connections": 1,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "secret_provider": {
+    "mode": "in_memory_test"
+  },
+  "sender": {
+    "dispatch_domain": "primary",
+    "approved_slots": 8,
+    "poll_interval_ms": 100,
+    "request_timeout_ms": 5000,
+    "max_response_bytes": 65536
+  },
+  "egress": {
+    "mode": "trusted_local_fixture",
+    "allow_fixture_receiver": true,
+    "fixture_receiver_authority": "receiver.fixture.test:19095",
+    "fixture_receiver_path": "/hooks/relayquill",
+    "fixture_resolve_ip": "127.0.0.1"
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

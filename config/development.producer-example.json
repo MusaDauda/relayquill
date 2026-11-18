@@ -1,0 +1,23 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "producer_example",
+  "api_target": {
+    "origin": "http://127.0.0.1:8005",
+    "project_id": "00000000-0000-4000-8000-000000000001",
+    "credential_secret_ref": "custody:producer-example/credential"
+  },
+  "secret_provider": {
+    "mode": "local_ipc_provider",
+    "ipc": {
+      "env_name": "dev",
+      "channel": "provider"
+    }
+  },
+  "runs_dir": "fixtures/runs",
+  "project_scope": {
+    "project_slug": "billing-events",
+    "producer_credential_ref": "custody:producer-example/credential"
+  }
+}

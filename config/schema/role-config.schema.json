@@ -1,0 +1,952 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relayquill.example/schemas/role-config.schema.json",
+  "title": "Relayquill Role Configuration",
+  "type": "object",
+  "allOf": [
+    {
+      "required": ["schema_version", "profile", "process_role"],
+      "properties": {
+        "$schema": { "type": "string", "minLength": 1 },
+        "schema_version": { "type": "integer", "const": 1 },
+        "profile": { "$ref": "#/$defs/ProfileKind" },
+        "process_role": { "$ref": "#/$defs/ProcessRole" }
+      }
+    },
+    {
+      "if": { "properties": { "profile": { "const": "release" } } },
+      "then": {
+        "properties": {
+          "database": {
+            "properties": {
+              "mode": { "const": "release_rds_iam" },
+              "tls_mode": { "const": "verify_full" }
+            }
+          },
+          "broker": {
+            "properties": {
+              "mode": { "const": "release_native_tls" }
+            }
+          },
+          "auth": {
+            "properties": {
+              "cookie_profile": { "const": "release_https" },
+              "allowed_origins": {
+                "items": { "type": "string", "pattern": "^https://" }
+              }
+            }
+          },
+          "http": {
+            "properties": {
+              "public_origin": { "type": "string", "pattern": "^https://" }
+            }
+          },
+          "egress": {
+            "properties": {
+              "mode": { "const": "strict_public_https" },
+              "allow_fixture_receiver": { "const": false }
+            }
+          },
+          "secret_provider": {
+            "properties": {
+              "mode": { "enum": ["aws_secrets_manager", "env_reference"] }
+            }
+          },
+          "provider": {
+            "properties": {
+              "custody_snapshot_enabled": { "const": false }
+            }
+          }
+        }
+      }
+    },
+    {
+      "oneOf": [
+        {
+          "description": "API server role",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "http", "database", "auth", "secret_provider", "protocol"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "api" },
+            "http": { "$ref": "#/$defs/HttpConfig" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                { "properties": { "role": { "const": "rq_api" }, "schema": { "const": "rq" } } }
+              ]
+            },
+            "auth": { "$ref": "#/$defs/AuthConfig" },
+            "secret_provider": { "$ref": "#/$defs/SecretProviderRef" },
+            "operator_channel": { "$ref": "#/$defs/IpcChannelRef" },
+            "telemetry": { "$ref": "#/$defs/TelemetryConfig" },
+            "protocol": { "$ref": "#/$defs/ProtocolConfig" }
+          }
+        },
+        {
+          "description": "Outbox relay worker role",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "database", "broker", "relay", "protocol"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "relay" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "rq_relay" },
+                    "schema": { "const": "rq" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "broker": { "$ref": "#/$defs/BrokerConfig" },
+            "relay": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["poll_interval_ms", "batch_size", "claim_lease_ms", "publish_concurrency", "publish_timeout_ms"],
+              "properties": {
+                "poll_interval_ms": { "type": "integer", "minimum": 10, "maximum": 60000 },
+                "batch_size": { "type": "integer", "minimum": 1, "maximum": 256 },
+                "claim_lease_ms": { "type": "integer", "minimum": 1000, "maximum": 300000 },
+                "publish_concurrency": { "type": "integer", "minimum": 1, "maximum": 128 },
+                "publish_timeout_ms": { "type": "integer", "minimum": 250, "maximum": 60000 }
+              }
+            },
+            "telemetry": { "$ref": "#/$defs/TelemetryConfig" },
+            "protocol": { "$ref": "#/$defs/ProtocolConfig" }
+          }
+        },
+        {
+          "description": "JetStream fanout worker role",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "database", "broker", "fanout", "protocol"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "fanout" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "rq_fanout" },
+                    "schema": { "const": "rq" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "broker": { "$ref": "#/$defs/BrokerConfig" },
+            "fanout": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ack_wait_ms", "max_deliver", "max_ack_pending", "max_batch", "max_bytes", "max_expires_ms"],
+              "properties": {
+                "ack_wait_ms": { "type": "integer", "minimum": 1000, "maximum": 300000 },
+                "max_deliver": { "type": "integer", "minimum": 1, "maximum": 100 },
+                "max_ack_pending": { "type": "integer", "minimum": 1, "maximum": 4096 },
+                "max_batch": { "type": "integer", "minimum": 1, "maximum": 256 },
+                "max_bytes": { "type": "integer", "minimum": 4096, "maximum": 16777216 },
+                "max_expires_ms": { "type": "integer", "minimum": 500, "maximum": 60000 }
+              }
+            },
+            "telemetry": { "$ref": "#/$defs/TelemetryConfig" },
+            "protocol": { "$ref": "#/$defs/ProtocolConfig" }
+          }
+        },
+        {
+          "description": "Webhook sender worker role",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "database", "secret_provider", "sender", "egress", "protocol"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "sender" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "rq_sender" },
+                    "schema": { "const": "rq" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "secret_provider": { "$ref": "#/$defs/SecretProviderRef" },
+            "sender": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["dispatch_domain", "approved_slots", "poll_interval_ms", "request_timeout_ms", "max_response_bytes"],
+              "properties": {
+                "dispatch_domain": { "type": "string", "minLength": 1, "maxLength": 64 },
+                "approved_slots": { "type": "integer", "minimum": 1, "maximum": 128 },
+                "poll_interval_ms": { "type": "integer", "minimum": 10, "maximum": 60000 },
+                "request_timeout_ms": { "type": "integer", "minimum": 500, "maximum": 60000 },
+                "max_response_bytes": { "type": "integer", "minimum": 1024, "maximum": 1048576 }
+              }
+            },
+            "egress": { "$ref": "#/$defs/EgressConfig" },
+            "telemetry": { "$ref": "#/$defs/TelemetryConfig" },
+            "protocol": { "$ref": "#/$defs/ProtocolConfig" }
+          }
+        },
+        {
+          "description": "Coordinator background role",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "database", "coordinator", "protocol"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "coordinator" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "rq_coordinator" },
+                    "schema": { "const": "rq" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "coordinator": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["loop_interval_ms", "reaper_batch_size", "retention_batch_size", "projection_batch_size"],
+              "properties": {
+                "loop_interval_ms": { "type": "integer", "minimum": 100, "maximum": 300000 },
+                "reaper_batch_size": { "type": "integer", "minimum": 1, "maximum": 1000 },
+                "retention_batch_size": { "type": "integer", "minimum": 1, "maximum": 1000 },
+                "projection_batch_size": { "type": "integer", "minimum": 1, "maximum": 1000 }
+              }
+            },
+            "telemetry": { "$ref": "#/$defs/TelemetryConfig" },
+            "protocol": { "$ref": "#/$defs/ProtocolConfig" }
+          }
+        },
+        {
+          "description": "Admin DB and broker migrator/operator",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "command_role", "database", "broker", "migrations_dir", "protocol"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "admin" },
+            "command_role": { "const": "db_and_broker_admin" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "rq_migrator" },
+                    "schema": { "const": "rq" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "broker": { "$ref": "#/$defs/BrokerConfig" },
+            "migrations_dir": { "$ref": "#/$defs/RepoRelativePath" },
+            "protocol": { "$ref": "#/$defs/ProtocolConfig" }
+          }
+        },
+        {
+          "description": "Admin signing issuer role",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "command_role", "database", "secret_provider", "protocol"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "admin" },
+            "command_role": { "const": "signing_issuer" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "rq_signing_issuer" },
+                    "schema": { "const": "rq" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "secret_provider": { "$ref": "#/$defs/SecretProviderRef" },
+            "protocol": { "$ref": "#/$defs/ProtocolConfig" }
+          }
+        },
+        {
+          "description": "Admin local fixture secret provider",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "command_role", "ipc", "provider"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "enum": ["portable_pglite", "development_trusted_local"] },
+            "process_role": { "const": "admin" },
+            "command_role": { "const": "fixture_provider" },
+            "ipc": { "$ref": "#/$defs/IpcChannelRef" },
+            "provider": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["max_entries", "max_entry_bytes", "custody_snapshot_enabled"],
+              "properties": {
+                "max_entries": { "type": "integer", "minimum": 1, "maximum": 65536 },
+                "max_entry_bytes": { "type": "integer", "minimum": 64, "maximum": 65536 },
+                "custody_snapshot_enabled": { "type": "boolean" },
+                "custody_snapshot_path": { "$ref": "#/$defs/RepoRelativePath" }
+              }
+            }
+          }
+        },
+        {
+          "description": "Admin bootstrap operator IPC client",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "command_role", "operator_channel"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "admin" },
+            "command_role": { "const": "bootstrap_operator" },
+            "operator_channel": { "$ref": "#/$defs/IpcChannelRef" }
+          }
+        },
+        {
+          "description": "Admin recovery operator or reviewer role",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "command_role", "recovery"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "admin" },
+            "command_role": { "enum": ["recovery_operator", "recovery_reviewer"] },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                { "properties": { "role": { "const": "rq_recovery" }, "schema": { "const": "rq" } } }
+              ]
+            },
+            "operator_channel": { "$ref": "#/$defs/IpcChannelRef" },
+            "recovery": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["actor_role", "plan_dir", "require_two_person_review"],
+              "properties": {
+                "actor_role": { "enum": ["operator", "reviewer"] },
+                "plan_dir": { "$ref": "#/$defs/RepoRelativePath" },
+                "require_two_person_review": { "type": "boolean" },
+                "target_schema_revision": { "type": "string", "minLength": 1, "maxLength": 64 }
+              }
+            }
+          }
+        },
+        {
+          "description": "Admin diagnostics operator role",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "command_role", "diagnostics"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "admin" },
+            "command_role": { "const": "diagnostics_operator" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                { "properties": { "role": { "const": "rq_reporter" }, "schema": { "const": "rq" } } }
+              ]
+            },
+            "operator_channel": { "$ref": "#/$defs/IpcChannelRef" },
+            "diagnostics": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["max_rows", "query_timeout_ms", "redact_payloads"],
+              "properties": {
+                "max_rows": { "type": "integer", "minimum": 1, "maximum": 10000 },
+                "query_timeout_ms": { "type": "integer", "minimum": 500, "maximum": 60000 },
+                "redact_payloads": { "type": "boolean", "const": true }
+              }
+            }
+          }
+        },
+        {
+          "description": "Example receiver runtime",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "http", "database", "secret_provider", "protocol"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "receiver" },
+            "http": { "$ref": "#/$defs/HttpBindConfig" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "receiver_runtime" },
+                    "schema": { "const": "rc" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "secret_provider": { "$ref": "#/$defs/SecretProviderRef" },
+            "control_channel": { "$ref": "#/$defs/IpcChannelRef" },
+            "telemetry": { "$ref": "#/$defs/TelemetryConfig" },
+            "protocol": { "$ref": "#/$defs/ProtocolConfig" }
+          }
+        },
+        {
+          "description": "Example receiver migrator",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "database", "migrations_dir"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "receiver_migrator" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "receiver_migrator" },
+                    "schema": { "const": "rc" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "migrations_dir": { "$ref": "#/$defs/RepoRelativePath" }
+          }
+        },
+        {
+          "description": "Example receiver operator IPC client",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "control_channel"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "receiver_operator" },
+            "control_channel": { "$ref": "#/$defs/IpcChannelRef" }
+          }
+        },
+        {
+          "description": "Example provider ingress runtime",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "http", "database", "secret_provider", "relayquill_api", "protocol"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "provider_ingress" },
+            "http": { "$ref": "#/$defs/HttpBindConfig" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "provider_runtime" },
+                    "schema": { "const": "pi" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "secret_provider": { "$ref": "#/$defs/SecretProviderRef" },
+            "relayquill_api": { "$ref": "#/$defs/ApiTargetConfig" },
+            "control_channel": { "$ref": "#/$defs/IpcChannelRef" },
+            "telemetry": { "$ref": "#/$defs/TelemetryConfig" },
+            "protocol": { "$ref": "#/$defs/ProtocolConfig" }
+          }
+        },
+        {
+          "description": "Example provider ingress migrator",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "database", "migrations_dir"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "provider_ingress_migrator" },
+            "database": {
+              "allOf": [
+                { "$ref": "#/$defs/DatabaseConfig" },
+                {
+                  "properties": {
+                    "role": { "const": "provider_migrator" },
+                    "schema": { "const": "pi" },
+                    "pool_mode": { "enum": ["direct", "session_pooler"] }
+                  }
+                }
+              ]
+            },
+            "migrations_dir": { "$ref": "#/$defs/RepoRelativePath" }
+          }
+        },
+        {
+          "description": "Example provider ingress fixture client",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "http_target", "control_channel"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "provider_ingress_fixture" },
+            "http_target": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["base_url", "stripe_path", "paystack_path"],
+              "properties": {
+                "base_url": { "type": "string", "pattern": "^https?://" },
+                "stripe_path": { "type": "string", "minLength": 1 },
+                "paystack_path": { "type": "string", "minLength": 1 }
+              }
+            },
+            "control_channel": { "$ref": "#/$defs/IpcChannelRef" }
+          }
+        },
+        {
+          "description": "Example producer CLI",
+          "additionalProperties": false,
+          "required": ["schema_version", "profile", "process_role", "api_target", "secret_provider", "runs_dir", "project_scope"],
+          "properties": {
+            "$schema": { "type": "string" },
+            "schema_version": { "type": "integer", "const": 1 },
+            "profile": { "$ref": "#/$defs/ProfileKind" },
+            "process_role": { "const": "producer_example" },
+            "api_target": { "$ref": "#/$defs/ApiTargetConfig" },
+            "secret_provider": { "$ref": "#/$defs/SecretProviderRef" },
+            "runs_dir": { "$ref": "#/$defs/RepoRelativePath" },
+            "project_scope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["project_slug", "producer_credential_ref"],
+              "properties": {
+                "project_slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,62}$" },
+                "producer_credential_ref": { "$ref": "#/$defs/SecretRefString" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "ProfileKind": {
+      "type": "string",
+      "enum": [
+        "portable_pglite",
+        "development_trusted_local",
+        "hosted_neon",
+        "hosted_supabase",
+        "hosted_synadia_ngs",
+        "release"
+      ]
+    },
+    "ProcessRole": {
+      "type": "string",
+      "enum": [
+        "api",
+        "relay",
+        "fanout",
+        "sender",
+        "coordinator",
+        "admin",
+        "receiver",
+        "receiver_migrator",
+        "receiver_operator",
+        "provider_ingress",
+        "provider_ingress_migrator",
+        "provider_ingress_fixture",
+        "producer_example"
+      ]
+    },
+    "RepoRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 260,
+      "not": { "pattern": "^(/|\\\\|[A-Za-z]:)" }
+    },
+    "SecretRefString": {
+      "type": "string",
+      "pattern": "^(env:[A-Z][A-Z0-9_]{1,127}|custody:[a-z0-9/_-]{3,128}|aws-sm:[a-zA-Z0-9/_+=.@-]{3,256})$"
+    },
+    "IpcChannelRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["env_name", "channel"],
+      "properties": {
+        "env_name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$" },
+        "channel": {
+          "type": "string",
+          "enum": ["provider", "api-admin", "receiver-control", "provider-ingress-control"]
+        },
+        "runtime_dir_env": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" }
+      }
+    },
+    "SecretProviderRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["in_memory_test", "local_ipc_provider", "env_reference", "aws_secrets_manager"]
+        },
+        "ipc": { "$ref": "#/$defs/IpcChannelRef" },
+        "region": { "type": "string", "pattern": "^[a-z]{2}-[a-z-]+-[0-9]+$" },
+        "secret_prefix": { "type": "string", "minLength": 1, "maxLength": 128 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "local_ipc_provider" } } },
+          "then": { "required": ["ipc"] }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "aws_secrets_manager" } } },
+          "then": { "required": ["region", "secret_prefix"] }
+        }
+      ]
+    },
+    "HttpBindConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "trust_proxy": { "type": "boolean" }
+      }
+    },
+    "HttpConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port", "public_origin", "sse_heartbeat_ms", "sse_max_lifetime_ms"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "public_origin": { "type": "string", "pattern": "^https?://" },
+        "trust_proxy": { "type": "boolean" },
+        "sse_heartbeat_ms": { "type": "integer", "minimum": 1000, "maximum": 60000 },
+        "sse_max_lifetime_ms": { "type": "integer", "minimum": 5000, "maximum": 3600000 }
+      }
+    },
+    "AuthConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rp_id", "allowed_origins", "cookie_profile"],
+      "properties": {
+        "rp_id": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "allowed_origins": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^https?://" }
+        },
+        "cookie_profile": { "type": "string", "enum": ["development_only", "release_https"] }
+      }
+    },
+    "EgressConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "allow_fixture_receiver"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["trusted_local_fixture", "strict_public_https"] },
+        "allow_fixture_receiver": { "type": "boolean" },
+        "fixture_receiver_authority": { "type": "string", "minLength": 3, "maxLength": 255 },
+        "fixture_receiver_path": { "type": "string", "pattern": "^/" },
+        "fixture_resolve_ip": { "type": "string", "const": "127.0.0.1" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "allow_fixture_receiver": { "const": true } } },
+          "then": {
+            "required": ["fixture_receiver_authority", "fixture_receiver_path", "fixture_resolve_ip"],
+            "properties": { "mode": { "const": "trusted_local_fixture" } }
+          }
+        }
+      ]
+    },
+    "ApiTargetConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "project_id", "credential_secret_ref"],
+      "properties": {
+        "origin": { "type": "string", "pattern": "^https?://" },
+        "project_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "credential_secret_ref": { "$ref": "#/$defs/SecretRefString" }
+      }
+    },
+    "DatabaseConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode", "isolation", "host", "port", "name", "schema", "support_schema",
+        "role", "authentication", "tls_mode", "pool_mode",
+        "maximum_connections", "connection_timeout_ms", "statement_timeout_ms", "lock_timeout_ms"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["portable_pglite", "development_trusted_local", "hosted_neon", "hosted_supabase", "release_rds_iam"]
+        },
+        "isolation": { "type": "string", "enum": ["separate_databases", "shared_database_schemas"] },
+        "host": { "type": "string", "minLength": 1, "maxLength": 255, "not": { "pattern": "^(postgres|postgresql)://" } },
+        "port": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,62}$" },
+        "schema": { "type": "string", "enum": ["rq", "rc", "pi"] },
+        "support_schema": { "type": "string", "enum": ["rq_support", "extensions"] },
+        "role": {
+          "type": "string",
+          "enum": [
+            "rq_api", "rq_relay", "rq_fanout", "rq_sender", "rq_coordinator",
+            "rq_reporter", "rq_signing_issuer", "rq_migrator", "rq_recovery",
+            "receiver_runtime", "receiver_migrator",
+            "provider_runtime", "provider_migrator"
+          ]
+        },
+        "authentication": {
+          "type": "string",
+          "enum": ["in_process_pglite", "trusted_local_only", "secret_provider_password", "aws_rds_iam_token"]
+        },
+        "password_secret_ref": { "$ref": "#/$defs/SecretRefString" },
+        "tls_mode": { "type": "string", "enum": ["in_process", "disabled_fixture", "verify_full"] },
+        "tls_ca_file": { "type": "string", "minLength": 1, "maxLength": 260 },
+        "pool_mode": { "type": "string", "enum": ["direct", "session_pooler", "transaction_pooler"] },
+        "maximum_connections": { "type": "integer", "minimum": 1, "maximum": 128 },
+        "connection_timeout_ms": { "type": "integer", "minimum": 500, "maximum": 60000 },
+        "statement_timeout_ms": { "type": "integer", "minimum": 500, "maximum": 300000 },
+        "lock_timeout_ms": { "type": "integer", "minimum": 100, "maximum": 30000 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "portable_pglite" } } },
+          "then": {
+            "properties": {
+              "authentication": { "const": "in_process_pglite" },
+              "tls_mode": { "const": "in_process" },
+              "pool_mode": { "const": "direct" },
+              "port": { "const": 0 },
+              "maximum_connections": { "const": 1 }
+            },
+            "not": { "required": ["password_secret_ref"] }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "development_trusted_local" } } },
+          "then": {
+            "properties": {
+              "host": { "const": "127.0.0.1" },
+              "authentication": { "const": "trusted_local_only" },
+              "tls_mode": { "const": "disabled_fixture" },
+              "pool_mode": { "const": "direct" }
+            },
+            "not": { "required": ["password_secret_ref"] }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "hosted_neon" } } },
+          "then": {
+            "required": ["password_secret_ref"],
+            "properties": {
+              "authentication": { "const": "secret_provider_password" },
+              "tls_mode": { "const": "verify_full" },
+              "connection_timeout_ms": { "type": "integer", "minimum": 10000 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "hosted_supabase" } } },
+          "then": {
+            "required": ["password_secret_ref"],
+            "properties": {
+              "isolation": { "const": "shared_database_schemas" },
+              "name": { "const": "postgres" },
+              "authentication": { "const": "secret_provider_password" },
+              "tls_mode": { "const": "verify_full" },
+              "pool_mode": { "enum": ["direct", "session_pooler", "transaction_pooler"] }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "release_rds_iam" } } },
+          "then": {
+            "properties": {
+              "authentication": { "const": "aws_rds_iam_token" },
+              "tls_mode": { "const": "verify_full" },
+              "pool_mode": { "enum": ["direct", "session_pooler"] }
+            },
+            "not": { "required": ["password_secret_ref"] }
+          }
+        }
+      ]
+    },
+    "BrokerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode", "servers", "auth_mode", "stream_name", "subject_prefix",
+        "consumer_name", "replicas", "max_msgs", "max_bytes", "max_msg_size",
+        "max_age_ns", "duplicate_window_ns"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["in_memory_test", "embedded_go_tls", "development_loopback", "hosted_synadia_ngs", "release_native_tls"]
+        },
+        "servers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": { "type": "string", "minLength": 5, "maxLength": 255 }
+        },
+        "auth_mode": { "type": "string", "enum": ["none_fixture", "nkey_seed", "synadia_creds_jwt"] },
+        "secret_ref": { "$ref": "#/$defs/SecretRefString" },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "reject_unauthorized"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "handshake_first": { "type": "boolean" },
+            "ca_file": { "type": "string", "minLength": 1, "maxLength": 260 },
+            "reject_unauthorized": { "type": "boolean", "const": true }
+          }
+        },
+        "stream_name": { "type": "string", "pattern": "^[A-Z0-9_]{3,64}$" },
+        "subject_prefix": { "type": "string", "pattern": "^([a-z0-9_-]+\\.)*$", "maxLength": 64 },
+        "consumer_name": { "type": "string", "pattern": "^[A-Z0-9_]{3,64}$" },
+        "replicas": { "type": "integer", "enum": [1, 3] },
+        "max_msgs": { "type": "integer", "minimum": 1000, "maximum": 100000000 },
+        "max_bytes": { "type": "integer", "minimum": 1048576, "maximum": 107374182400 },
+        "max_msg_size": { "type": "integer", "const": 4096 },
+        "max_age_ns": { "type": "integer", "minimum": 60000000000, "maximum": 604800000000000 },
+        "duplicate_window_ns": { "type": "integer", "const": 120000000000 },
+        "inbox_prefix": { "type": "string", "pattern": "^_INBOX\\.[a-z0-9._-]+$" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "in_memory_test" } } },
+          "then": {
+            "properties": {
+              "servers": { "items": { "const": "in-memory" }, "minItems": 1, "maxItems": 1 },
+              "auth_mode": { "const": "none_fixture" },
+              "replicas": { "const": 1 }
+            },
+            "not": { "required": ["secret_ref"] }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "development_loopback" } } },
+          "then": {
+            "properties": {
+              "servers": { "items": { "pattern": "^nats://127\\.0\\.0\\.1:[0-9]{1,5}$" } },
+              "auth_mode": { "const": "none_fixture" },
+              "replicas": { "const": 1 }
+            },
+            "not": { "required": ["secret_ref"] }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "embedded_go_tls" } } },
+          "then": {
+            "required": ["tls"],
+            "properties": {
+              "servers": { "items": { "pattern": "^tls://127\\.0\\.0\\.1:[0-9]{1,5}$" } },
+              "auth_mode": { "enum": ["none_fixture", "nkey_seed"] },
+              "replicas": { "const": 1 },
+              "tls": {
+                "properties": {
+                  "enabled": { "const": true },
+                  "handshake_first": { "const": true },
+                  "reject_unauthorized": { "const": true }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "hosted_synadia_ngs" } } },
+          "then": {
+            "required": ["secret_ref", "tls"],
+            "properties": {
+              "servers": { "items": { "pattern": "^tls://[a-z0-9.-]+(:[0-9]{1,5})?$" } },
+              "auth_mode": { "const": "synadia_creds_jwt" },
+              "tls": {
+                "properties": {
+                  "enabled": { "const": true },
+                  "handshake_first": { "const": false },
+                  "reject_unauthorized": { "const": true }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "release_native_tls" } } },
+          "then": {
+            "required": ["secret_ref", "tls"],
+            "properties": {
+              "servers": {
+                "minItems": 3,
+                "items": { "pattern": "^tls://(?!127\\.0\\.0\\.1|localhost)[a-z0-9.-]+:[0-9]{1,5}$" }
+              },
+              "auth_mode": { "const": "nkey_seed" },
+              "replicas": { "const": 3 },
+              "tls": {
+                "required": ["enabled", "handshake_first", "ca_file", "reject_unauthorized"],
+                "properties": {
+                  "enabled": { "const": true },
+                  "handshake_first": { "const": true },
+                  "reject_unauthorized": { "const": true }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ProtocolConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["http_schema_version", "broker_envelope_version", "webhook_signature_version"],
+      "properties": {
+        "http_schema_version": { "type": "integer", "const": 1 },
+        "broker_envelope_version": { "type": "integer", "const": 1 },
+        "webhook_signature_version": { "type": "integer", "const": 1 }
+      }
+    },
+    "TelemetryConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "service_name", "max_queue_size", "max_export_batch_size"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "service_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "otlp_endpoint": { "type": "string", "pattern": "^https?://" },
+        "max_queue_size": { "type": "integer", "const": 2048 },
+        "max_export_batch_size": { "type": "integer", "const": 256 },
+        "trace_view_origin": { "type": "string", "pattern": "^https?://" }
+      }
+    }
+  }
+}

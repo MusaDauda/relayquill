@@ -1,0 +1,36 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "admin",
+  "command_role": "signing_issuer",
+  "database": {
+    "mode": "development_trusted_local",
+    "isolation": "separate_databases",
+    "host": "127.0.0.1",
+    "port": 55005,
+    "name": "relayquill",
+    "schema": "rq",
+    "support_schema": "rq_support",
+    "role": "rq_signing_issuer",
+    "authentication": "trusted_local_only",
+    "tls_mode": "disabled_fixture",
+    "pool_mode": "direct",
+    "maximum_connections": 2,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "secret_provider": {
+    "mode": "local_ipc_provider",
+    "ipc": {
+      "env_name": "dev",
+      "channel": "provider"
+    }
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

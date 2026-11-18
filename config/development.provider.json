@@ -1,0 +1,17 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "admin",
+  "command_role": "fixture_provider",
+  "ipc": {
+    "env_name": "dev",
+    "channel": "provider"
+  },
+  "provider": {
+    "max_entries": 4096,
+    "max_entry_bytes": 4096,
+    "custody_snapshot_enabled": true,
+    "custody_snapshot_path": ".relayquill/dev-custody.enc"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "receiver_migrator",
+  "database": {
+    "mode": "development_trusted_local",
+    "isolation": "separate_databases",
+    "host": "127.0.0.1",
+    "port": 55005,
+    "name": "relayquill_receiver",
+    "schema": "rc",
+    "support_schema": "rq_support",
+    "role": "receiver_migrator",
+    "authentication": "trusted_local_only",
+    "tls_mode": "disabled_fixture",
+    "pool_mode": "direct",
+    "maximum_connections": 2,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 30000,
+    "lock_timeout_ms": 5000
+  },
+  "migrations_dir": "examples/receiver/migrations"
+}

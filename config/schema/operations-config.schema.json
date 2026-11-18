@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://relayquill.example/schemas/operations-config.schema.json",
+  "title": "Relayquill Operations & Recovery Configuration",
+  "oneOf": [
+    {
+      "description": "Recovery target configuration",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "kind", "database", "expected_schema_revision", "backup_verification"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "schema_version": { "type": "integer", "const": 1 },
+        "kind": { "const": "recovery_target" },
+        "database": { "$ref": "./role-config.schema.json#/$defs/DatabaseConfig" },
+        "expected_schema_revision": { "type": "string", "pattern": "^[0-9]{4}$" },
+        "backup_verification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["require_pitr_timestamp", "require_immutable_archive"],
+          "properties": {
+            "require_pitr_timestamp": { "type": "boolean" },
+            "require_immutable_archive": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    {
+      "description": "Recovery action request template",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "kind", "incident_id", "operation_type", "target_profile", "requested_by"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "schema_version": { "type": "integer", "const": 1 },
+        "kind": { "const": "recovery_action_request" },
+        "incident_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "operation_type": { "type": "string", "enum": ["verify_backup", "stage_restore", "promote_cutover"] },
+        "target_profile": { "type": "string", "minLength": 1 },
+        "requested_by": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    {
+      "description": "Diagnostics query request template",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "kind", "scope", "limit", "redact_payloads"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "schema_version": { "type": "integer", "const": 1 },
+        "kind": { "const": "diagnostics_request" },
+        "scope": { "type": "string", "enum": ["summary", "outbox_lag", "delivery_stuck", "circuit_breakers"] },
+        "project_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "redact_payloads": { "type": "boolean", "const": true }
+      }
+    },
+    {
+      "description": "Load generator runtime configuration",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "kind", "api_origin", "project_id", "credential_secret_ref", "target_rps", "duration_seconds", "concurrency"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "schema_version": { "type": "integer", "const": 1 },
+        "kind": { "const": "load_runtime" },
+        "api_origin": { "type": "string", "pattern": "^https?://" },
+        "project_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "credential_secret_ref": { "$ref": "./role-config.schema.json#/$defs/SecretRefString" },
+        "target_rps": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "duration_seconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "concurrency": { "type": "integer", "minimum": 1, "maximum": 256 }
+      }
+    },
+    {
+      "description": "Load observer configuration",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "kind", "api_origin", "poll_interval_ms", "thresholds"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "schema_version": { "type": "integer", "const": 1 },
+        "kind": { "const": "load_observer" },
+        "api_origin": { "type": "string", "pattern": "^https?://" },
+        "operator_channel": { "$ref": "./role-config.schema.json#/$defs/IpcChannelRef" },
+        "poll_interval_ms": { "type": "integer", "minimum": 100, "maximum": 30000 },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_p95_admission_ms", "max_outbox_lag_ms", "max_error_rate"],
+          "properties": {
+            "max_p95_admission_ms": { "type": "integer", "minimum": 10, "maximum": 60000 },
+            "max_outbox_lag_ms": { "type": "integer", "minimum": 100, "maximum": 300000 },
+            "max_error_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    }
+  ]
+}

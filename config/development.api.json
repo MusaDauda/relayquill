@@ -1,0 +1,51 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "development_trusted_local",
+  "process_role": "api",
+  "http": {
+    "host": "127.0.0.1",
+    "port": 8005,
+    "public_origin": "http://localhost:5205",
+    "sse_heartbeat_ms": 10000,
+    "sse_max_lifetime_ms": 60000
+  },
+  "database": {
+    "mode": "development_trusted_local",
+    "isolation": "separate_databases",
+    "host": "127.0.0.1",
+    "port": 55005,
+    "name": "relayquill",
+    "schema": "rq",
+    "support_schema": "rq_support",
+    "role": "rq_api",
+    "authentication": "trusted_local_only",
+    "tls_mode": "disabled_fixture",
+    "pool_mode": "direct",
+    "maximum_connections": 8,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "auth": {
+    "rp_id": "localhost",
+    "allowed_origins": ["http://localhost:5205"],
+    "cookie_profile": "development_only"
+  },
+  "secret_provider": {
+    "mode": "local_ipc_provider",
+    "ipc": {
+      "env_name": "dev",
+      "channel": "provider"
+    }
+  },
+  "operator_channel": {
+    "env_name": "dev",
+    "channel": "api-admin"
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

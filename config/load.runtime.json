@@ -1,0 +1,11 @@
+{
+  "$schema": "./schema/operations-config.schema.json",
+  "schema_version": 1,
+  "kind": "load_runtime",
+  "api_origin": "http://127.0.0.1:8005",
+  "project_id": "00000000-0000-4000-8000-000000000001",
+  "credential_secret_ref": "custody:load-test/producer-credential",
+  "target_rps": 50,
+  "duration_seconds": 30,
+  "concurrency": 8
+}

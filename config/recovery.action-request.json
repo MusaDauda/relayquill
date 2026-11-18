@@ -1,0 +1,10 @@
+{
+  "$schema": "./schema/operations-config.schema.json",
+  "schema_version": 1,
+  "kind": "recovery_action_request",
+  "incident_id": "00000000-0000-4000-8000-000000000101",
+  "operation_type": "verify_backup",
+  "target_profile": "config/recovery.target.json",
+  "requested_by": "primary-operator",
+  "reason": "Scheduled point-in-time recovery verification"
+}

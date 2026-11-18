@@ -1,0 +1,35 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "release",
+  "process_role": "admin",
+  "command_role": "recovery_operator",
+  "database": {
+    "mode": "release_rds_iam",
+    "isolation": "separate_databases",
+    "host": "relayquill-pg-restore.example.us-east-1.rds.amazonaws.com",
+    "port": 5432,
+    "name": "relayquill",
+    "schema": "rq",
+    "support_schema": "rq_support",
+    "role": "rq_recovery",
+    "authentication": "aws_rds_iam_token",
+    "tls_mode": "verify_full",
+    "tls_ca_file": "/etc/relayquill/certs/aws-rds-global-bundle.pem",
+    "pool_mode": "direct",
+    "maximum_connections": 2,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 30000,
+    "lock_timeout_ms": 5000
+  },
+  "operator_channel": {
+    "env_name": "prod",
+    "channel": "api-admin"
+  },
+  "recovery": {
+    "actor_role": "operator",
+    "plan_dir": ".relayquill/recovery-plans",
+    "require_two_person_review": true,
+    "target_schema_revision": "0009"
+  }
+}

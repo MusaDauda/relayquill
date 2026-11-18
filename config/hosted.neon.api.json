@@ -1,0 +1,45 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "hosted_neon",
+  "process_role": "api",
+  "http": {
+    "host": "127.0.0.1",
+    "port": 8005,
+    "public_origin": "https://console.relayquill.example",
+    "trust_proxy": true,
+    "sse_heartbeat_ms": 10000,
+    "sse_max_lifetime_ms": 60000
+  },
+  "database": {
+    "mode": "hosted_neon",
+    "isolation": "separate_databases",
+    "host": "ep-example-pooler.us-east-1.aws.neon.tech",
+    "port": 5432,
+    "name": "neondb",
+    "schema": "rq",
+    "support_schema": "rq_support",
+    "role": "rq_api",
+    "authentication": "secret_provider_password",
+    "password_secret_ref": "env:RELAYQUILL_NEON_PASSWORD_RQ_API",
+    "tls_mode": "verify_full",
+    "pool_mode": "transaction_pooler",
+    "maximum_connections": 8,
+    "connection_timeout_ms": 10000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "auth": {
+    "rp_id": "console.relayquill.example",
+    "allowed_origins": ["https://console.relayquill.example"],
+    "cookie_profile": "release_https"
+  },
+  "secret_provider": {
+    "mode": "env_reference"
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

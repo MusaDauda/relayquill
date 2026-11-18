@@ -1,0 +1,17 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "release",
+  "process_role": "admin",
+  "command_role": "recovery_reviewer",
+  "operator_channel": {
+    "env_name": "prod",
+    "channel": "api-admin"
+  },
+  "recovery": {
+    "actor_role": "reviewer",
+    "plan_dir": ".relayquill/recovery-plans",
+    "require_two_person_review": true,
+    "target_schema_revision": "0009"
+  }
+}

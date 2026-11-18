@@ -1,0 +1,44 @@
+{
+  "$schema": "./schema/role-config.schema.json",
+  "schema_version": 1,
+  "profile": "portable_pglite",
+  "process_role": "provider_ingress",
+  "http": {
+    "host": "127.0.0.1",
+    "port": 19096
+  },
+  "database": {
+    "mode": "portable_pglite",
+    "isolation": "separate_databases",
+    "host": "in-memory",
+    "port": 0,
+    "name": "relayquill_provider",
+    "schema": "pi",
+    "support_schema": "rq_support",
+    "role": "provider_runtime",
+    "authentication": "in_process_pglite",
+    "tls_mode": "in_process",
+    "pool_mode": "direct",
+    "maximum_connections": 1,
+    "connection_timeout_ms": 5000,
+    "statement_timeout_ms": 5000,
+    "lock_timeout_ms": 2000
+  },
+  "secret_provider": {
+    "mode": "in_memory_test"
+  },
+  "relayquill_api": {
+    "origin": "http://127.0.0.1:8005",
+    "project_id": "00000000-0000-4000-8000-000000000001",
+    "credential_secret_ref": "env:RELAYQUILL_PRODUCER_CREDENTIAL"
+  },
+  "control_channel": {
+    "env_name": "portable",
+    "channel": "provider-ingress-control"
+  },
+  "protocol": {
+    "http_schema_version": 1,
+    "broker_envelope_version": 1,
+    "webhook_signature_version": 1
+  }
+}

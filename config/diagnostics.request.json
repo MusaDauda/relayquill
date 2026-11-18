@@ -1,0 +1,8 @@
+{
+  "$schema": "./schema/operations-config.schema.json",
+  "schema_version": 1,
+  "kind": "diagnostics_request",
+  "scope": "summary",
+  "limit": 100,
+  "redact_payloads": true
+}

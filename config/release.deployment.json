@@ -1,0 +1,35 @@
+{
+  "$schema": "./schema/deployment-profile.schema.json",
+  "profile_version": 1,
+  "deployment_name": "relayquill-prod-us-east-1",
+  "region": "us-east-1",
+  "cpu_platform": "linux/amd64",
+  "dns_names": {
+    "console_origin": "https://console.relayquill.example",
+    "api_origin": "https://api.relayquill.example"
+  },
+  "roles": ["api", "relay", "fanout", "sender", "coordinator", "admin", "console", "broker"],
+  "resource_tags": {
+    "Application": "relayquill",
+    "Environment": "production",
+    "ManagedBy": "terraform"
+  },
+  "artifact_repositories": {
+    "node_services": "000000000000.dkr.ecr.us-east-1.amazonaws.com/relayquill/services",
+    "console": "000000000000.dkr.ecr.us-east-1.amazonaws.com/relayquill/console",
+    "broker_launcher": "000000000000.dkr.ecr.us-east-1.amazonaws.com/relayquill/broker-launcher"
+  },
+  "infrastructure_root": "infra/aws",
+  "backend_config_path": "config/release.backend.hcl",
+  "configuration_paths": {
+    "api": "config/release.api.json",
+    "relay": "config/release.relay.json",
+    "fanout": "config/release.fanout.json",
+    "sender": "config/release.sender.json",
+    "coordinator": "config/release.coordinator.json",
+    "admin": "config/release.admin.json"
+  },
+  "expected_schema_revision": "0009",
+  "release_record_directory": ".relayquill/releases",
+  "expected_identity_reference": "arn:aws:iam::000000000000:role/relayquill-release-deployer"
+}

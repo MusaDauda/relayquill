@@ -1,12 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  ALLOWED_ORDERING_CUTOVER_TRANSITIONS,
+  ALLOWED_SUBSCRIPTION_TRANSITIONS,
   AuthorizationDomainError,
   ConflictDomainError,
   ExpiredDomainError,
   InvariantViolationError,
   LimitExceededDomainError,
   RateLimitDomainError,
+  UnsupportedStateTransitionError,
   ValidationDomainError,
   activateOrderingCutover,
   addMilliseconds,
@@ -34,6 +37,8 @@ import {
   assertValidSubscriptionTopologyRange,
   assertWatchQuotaAvailable,
   beginOrderingCutover,
+  canTransition,
+  closeWatchLease,
   computeProposalExpiresAt,
   computeWatchLeaseExpiry,
   computeWatchStreamCutoff,
@@ -41,6 +46,7 @@ import {
   evaluateContentExpirationEligibility,
   evaluateReceiverOrderAcceptance,
   isHistoryRetirementEligible,
+  isHumanSessionExpired,
   isTopologyVersionInRange,
   markOrderingCutoverReady,
   parseControlEpoch,
@@ -61,6 +67,7 @@ import {
   parseSubscriptionId,
   parseUtcTimestamp,
   parseWatchLeaseId,
+  quarantineEndpoint,
   renewWatchLease,
   resumeProjectAdmission,
   reviewProposal,
@@ -154,15 +161,32 @@ test("Ordering guards enforce 128B key cap, head-only prep, skip rejection on se
     () =>
       markOrderingCutoverReady(draining, {
         materializedThroughEventSequence: 9n,
-        oldHeadsDrained: true
+        oldHeadsDrained: true,
+        now: addSeconds(T0, 10)
       }),
     ConflictDomainError
   );
+  assert.throws(
+    () =>
+      markOrderingCutoverReady(draining, {
+        materializedThroughEventSequence: 10n,
+        oldHeadsDrained: true,
+        now: addSeconds(T0, 900)
+      }),
+    ExpiredDomainError
+  );
   const ready = markOrderingCutoverReady(draining, {
     materializedThroughEventSequence: 10n,
-    oldHeadsDrained: true
+    oldHeadsDrained: true,
+    now: addSeconds(T0, 10)
   });
-  const activated = activateOrderingCutover(ready);
+  assert.throws(
+    () => activateOrderingCutover(ready, { now: addSeconds(T0, 900) }),
+    ExpiredDomainError
+  );
+  assert.equal(canTransition(ALLOWED_ORDERING_CUTOVER_TRANSITIONS, "draining", "expired"), true);
+  assert.equal(canTransition(ALLOWED_ORDERING_CUTOVER_TRANSITIONS, "ready", "expired"), true);
+  const activated = activateOrderingCutover(ready, { now: addSeconds(T0, 20) });
   assert.equal(activated.state, "activated");
 
   const firstCommit = evaluateReceiverOrderAcceptance({
@@ -344,6 +368,52 @@ test("Recovery, Installation, Topology, Access, and Watch enforce all governance
     AuthorizationDomainError
   );
   assert.throws(
+    () =>
+      assertSetRecoveryGateAllowed({
+        planScopeKind: "project",
+        targetScopeKind: "installation",
+        reopensAllowSend: false
+      }),
+    AuthorizationDomainError
+  );
+  assert.throws(
+    () =>
+      assertSetRecoveryGateAllowed({
+        planScopeKind: "project",
+        targetScopeKind: "tenant",
+        reopensAllowSend: false
+      }),
+    AuthorizationDomainError
+  );
+  assert.throws(
+    () =>
+      assertSetRecoveryGateAllowed({
+        planScopeKind: "tenant",
+        targetScopeKind: "installation",
+        reopensAllowSend: true
+      }),
+    AuthorizationDomainError
+  );
+  assert.throws(
+    () =>
+      assertSetRecoveryGateAllowed({
+        planScopeKind: "tenant",
+        targetScopeKind: "installation",
+        reopensAllowSend: false
+      }),
+    AuthorizationDomainError
+  );
+  assertSetRecoveryGateAllowed({
+    planScopeKind: "tenant",
+    targetScopeKind: "project",
+    reopensAllowSend: true
+  });
+  assertSetRecoveryGateAllowed({
+    planScopeKind: "installation",
+    targetScopeKind: "installation",
+    reopensAllowSend: true
+  });
+  assert.throws(
     () => assertEstablishTargetEpochAllowed("open", EPOCH_1, EPOCH_2),
     ConflictDomainError
   );
@@ -391,6 +461,28 @@ test("Recovery, Installation, Topology, Access, and Watch enforce all governance
   assert.throws(() => assertSubscriptionSchemaVersions(Array.from({ length: 17 }, (_, i) => i + 1)), LimitExceededDomainError);
 
   assertSigningPolicyInvariants({
+    signatureMode: "primary_only",
+    primaryKeyVersionId: KEY_V2,
+    overlapKeyVersionId: null,
+    overlapStartedAt: null,
+    overlapEndsAt: null,
+    oldKeySignUntil: null,
+    oldKeyVerifyUntil: null
+  });
+  assert.throws(
+    () =>
+      assertSigningPolicyInvariants({
+        signatureMode: "primary_only",
+        primaryKeyVersionId: KEY_V2,
+        overlapKeyVersionId: null,
+        overlapStartedAt: T0,
+        overlapEndsAt: null,
+        oldKeySignUntil: null,
+        oldKeyVerifyUntil: null
+      }),
+    InvariantViolationError
+  );
+  assertSigningPolicyInvariants({
     signatureMode: "bounded_dual_signature",
     primaryKeyVersionId: KEY_V2,
     overlapKeyVersionId: KEY_V1,
@@ -409,6 +501,32 @@ test("Recovery, Installation, Topology, Access, and Watch enforce all governance
         overlapEndsAt: addSeconds(T0, 900),
         oldKeySignUntil: addSeconds(T0, 700),
         oldKeyVerifyUntil: addSeconds(T0, 900)
+      }),
+    InvariantViolationError
+  );
+  assert.throws(
+    () =>
+      assertSigningPolicyInvariants({
+        signatureMode: "bounded_dual_signature",
+        primaryKeyVersionId: KEY_V2,
+        overlapKeyVersionId: KEY_V1,
+        overlapStartedAt: T0,
+        overlapEndsAt: addSeconds(T0, 900),
+        oldKeySignUntil: addSeconds(T0, 600),
+        oldKeyVerifyUntil: addSeconds(T0, 901)
+      }),
+    InvariantViolationError
+  );
+  assert.throws(
+    () =>
+      assertSigningPolicyInvariants({
+        signatureMode: "bounded_dual_signature",
+        primaryKeyVersionId: KEY_V2,
+        overlapKeyVersionId: KEY_V1,
+        overlapStartedAt: T0,
+        overlapEndsAt: addSeconds(T0, 900),
+        oldKeySignUntil: addSeconds(T0, -1),
+        oldKeyVerifyUntil: addSeconds(T0, 600)
       }),
     InvariantViolationError
   );
@@ -435,6 +553,32 @@ test("Recovery, Installation, Topology, Access, and Watch enforce all governance
   assert.equal(subUpdated.state, "active");
   assert.equal(subUpdated.sendHold, true);
 
+  // Security quarantine on subscription cannot be cleared by ordinary control actions
+  assert.equal(canTransition(ALLOWED_SUBSCRIPTION_TRANSITIONS, "quarantined", "active"), false);
+  const subQuarantined = applySubscriptionControlAction(subUpdated, "quarantine");
+  assert.equal(subQuarantined.state, "quarantined");
+  assert.equal(subQuarantined.sendHold, true);
+  assert.throws(
+    () => applySubscriptionControlAction(subQuarantined, "activate"),
+    UnsupportedStateTransitionError
+  );
+  assert.throws(
+    () => applySubscriptionControlAction(subQuarantined, "resume_future"),
+    UnsupportedStateTransitionError
+  );
+  assert.throws(
+    () => applySubscriptionControlAction(subQuarantined, "cutover_activate"),
+    ConflictDomainError
+  );
+  assert.throws(
+    () => applySubscriptionControlAction(subQuarantined, "release_send_hold"),
+    ConflictDomainError
+  );
+
+  const endpointQuarantined = quarantineEndpoint("active", 3n, ENDPOINT_ID);
+  assert.equal(endpointQuarantined.state, "quarantined");
+  assert.equal(endpointQuarantined.securityEpoch, 4n);
+
   // Access & Watch
   const machineNs = parseProducerNamespace("orders.api");
   const humanNs = parseProducerNamespace(`human.${PROPOSER_ID}`);
@@ -453,6 +597,57 @@ test("Recovery, Installation, Topology, Access, and Watch enforce all governance
     overlapStartedAt: T0,
     overlapEndsAt: addSeconds(T0, 900)
   });
+  assert.throws(
+    () =>
+      assertProducerCredentialTiming({
+        credentialId: CRED_ID,
+        issuedAt: T0,
+        expiresAt: addMilliseconds(T0, 2_592_000_000n),
+        overlapStartedAt: T0,
+        overlapEndsAt: null
+      }),
+    ValidationDomainError
+  );
+  assert.throws(
+    () =>
+      assertProducerCredentialTiming({
+        credentialId: CRED_ID,
+        issuedAt: T0,
+        expiresAt: addMilliseconds(T0, 2_592_000_000n),
+        overlapStartedAt: null,
+        overlapEndsAt: addSeconds(T0, 900)
+      }),
+    ValidationDomainError
+  );
+
+  assert.equal(
+    isHumanSessionExpired({
+      state: "active",
+      absoluteExpiresAt: addSeconds(T0, 3600),
+      idleExpiresAt: addSeconds(T0, 1800),
+      now: addSeconds(T0, 60)
+    }),
+    false
+  );
+  assert.equal(
+    isHumanSessionExpired({
+      state: "active",
+      absoluteExpiresAt: addSeconds(T0, 3600),
+      idleExpiresAt: addSeconds(T0, 1800),
+      now: addSeconds(T0, 1800)
+    }),
+    true
+  );
+  assert.equal(
+    isHumanSessionExpired({
+      state: "revoked",
+      absoluteExpiresAt: addSeconds(T0, 3600),
+      idleExpiresAt: addSeconds(T0, 1800),
+      now: addSeconds(T0, 60)
+    }),
+    true
+  );
+
   assert.throws(
     () =>
       assertCanConsumeAuthChallenge({
@@ -484,4 +679,7 @@ test("Recovery, Installation, Topology, Access, and Watch enforce all governance
   assert.throws(() => renewWatchLease(lease, addMilliseconds(T0, 500), authCutoff), RateLimitDomainError);
   const renewed = renewWatchLease(lease, addSeconds(T0, 2), authCutoff);
   assert.equal(renewed.leaseExpiresAt.equals(addSeconds(T0, 7)), true);
+  const closedLease = closeWatchLease(renewed);
+  assert.equal(closedLease.state, "closed");
+  assert.equal(closedLease.slotState, "released");
 });

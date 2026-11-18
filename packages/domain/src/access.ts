@@ -213,6 +213,13 @@ export function assertProducerCredentialTiming(input: {
       resourceRef: { kind: "producer_credential", id: input.credentialId }
     });
   }
+  if ((input.overlapStartedAt == null) !== (input.overlapEndsAt == null)) {
+    throw new ValidationDomainError({
+      code: "INVALID_VALUE",
+      message: "Producer credential overlap requires both overlapStartedAt and overlapEndsAt",
+      resourceRef: { kind: "producer_credential", id: input.credentialId }
+    });
+  }
   if (input.overlapStartedAt != null && input.overlapEndsAt != null) {
     const overlapMs = diffMilliseconds(input.overlapEndsAt, input.overlapStartedAt);
     if (overlapMs <= 0n || overlapMs > PRODUCER_CREDENTIAL_MAX_OVERLAP_MS) {

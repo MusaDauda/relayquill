@@ -128,6 +128,8 @@ export interface ProbeDeferralInput {
   readonly expectedCircuitGeneration: bigint;
   readonly expectedProbeGeneration: bigint;
   readonly probeAttemptId: AttemptId;
+  readonly ownerInstanceId: RuntimeInstanceId;
+  readonly controlEpoch: ControlEpoch;
   readonly decidedAt: Temporal.Instant;
   readonly prerequisiteDelayUntil?: Temporal.Instant | undefined;
 }
@@ -146,7 +148,9 @@ export function deferUnstartedCircuitProbe(
   if (
     circuit.circuitGeneration !== input.expectedCircuitGeneration ||
     circuit.probeGeneration !== input.expectedProbeGeneration ||
-    circuit.probeAttemptId !== input.probeAttemptId
+    circuit.probeAttemptId !== input.probeAttemptId ||
+    circuit.probeOwnerInstanceId !== input.ownerInstanceId ||
+    circuit.probeControlEpoch !== input.controlEpoch
   ) {
     throw new ConflictDomainError({
       code: "VERSION_CONFLICT",
@@ -177,6 +181,8 @@ export interface CircuitObservationInput {
   readonly circuitGenerationAtStart: bigint;
   readonly probeGenerationAtStart?: bigint | undefined;
   readonly attemptId: AttemptId;
+  readonly ownerInstanceId?: RuntimeInstanceId | undefined;
+  readonly controlEpoch?: ControlEpoch | undefined;
   readonly decidedAt: Temporal.Instant;
   readonly outcomeClass: DeliveryOutcomeClass | "benign_deferral" | "abandoned_started_probe";
 }
@@ -221,7 +227,7 @@ export function applyCircuitObservation(
     });
   }
 
-  if (input.outcomeClass === "benign_deferral" || input.outcomeClass === "permanent_policy_or_security") {
+  if (input.outcomeClass === "benign_deferral") {
     return Object.freeze({
       applied: false,
       circuit,
@@ -238,6 +244,14 @@ export function applyCircuitObservation(
     input.outcomeClass === "permanent_http" || input.outcomeClass === "permanent_redirect";
 
   if (circuit.state === "closed") {
+    if (input.outcomeClass === "permanent_policy_or_security") {
+      return Object.freeze({
+        applied: false,
+        circuit,
+        clearsSecurityQuarantine: false
+      });
+    }
+
     const diag = advanceDiagnosticWindow(
       circuit,
       input.decidedAt,
@@ -300,7 +314,9 @@ export function applyCircuitObservation(
   if (circuit.state === "half_open") {
     if (
       input.probeGenerationAtStart !== circuit.probeGeneration ||
-      input.attemptId !== circuit.probeAttemptId
+      input.attemptId !== circuit.probeAttemptId ||
+      input.ownerInstanceId !== circuit.probeOwnerInstanceId ||
+      input.controlEpoch !== circuit.probeControlEpoch
     ) {
       return Object.freeze({
         applied: false,

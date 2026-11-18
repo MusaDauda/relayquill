@@ -71,8 +71,8 @@ export const ALLOWED_ORDERING_DOMAIN_TRANSITIONS: TransitionMatrix<OrderingDomai
 export const ALLOWED_ORDERING_CUTOVER_TRANSITIONS: TransitionMatrix<OrderingCutoverPlanState> =
   Object.freeze({
     proposed: ["draining", "rejected", "expired", "revoked"],
-    draining: ["ready", "revoked"],
-    ready: ["activated", "revoked"],
+    draining: ["ready", "expired", "revoked"],
+    ready: ["activated", "expired", "revoked"],
     activated: [],
     rejected: [],
     expired: [],
@@ -256,8 +256,16 @@ export function markOrderingCutoverReady(
   input: {
     readonly materializedThroughEventSequence: bigint;
     readonly oldHeadsDrained: boolean;
+    readonly now: Temporal.Instant;
   }
 ): OrderingCutoverPlanSnapshot {
+  if (compareInstants(input.now, plan.expiresAt) >= 0) {
+    throw new ExpiredDomainError({
+      code: "EXPIRED",
+      message: "Ordering cutover plan has expired",
+      resourceRef: { kind: "ordering_cutover_plan", id: plan.planId }
+    });
+  }
   assertTransition(
     "ordering_cutover_plan",
     ALLOWED_ORDERING_CUTOVER_TRANSITIONS,
@@ -292,8 +300,16 @@ export function markOrderingCutoverReady(
 }
 
 export function activateOrderingCutover(
-  plan: OrderingCutoverPlanSnapshot
+  plan: OrderingCutoverPlanSnapshot,
+  input: { readonly now: Temporal.Instant }
 ): OrderingCutoverPlanSnapshot {
+  if (compareInstants(input.now, plan.expiresAt) >= 0) {
+    throw new ExpiredDomainError({
+      code: "EXPIRED",
+      message: "Ordering cutover plan has expired",
+      resourceRef: { kind: "ordering_cutover_plan", id: plan.planId }
+    });
+  }
   assertTransition(
     "ordering_cutover_plan",
     ALLOWED_ORDERING_CUTOVER_TRANSITIONS,

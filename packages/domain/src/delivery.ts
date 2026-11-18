@@ -277,10 +277,29 @@ export function finalizeDeliveryAttempt(
   }
 
   if (ctx.targetState === "retry_wait") {
+    if (isUnstartedOutcome && nextPrepFailures >= maxPrepFailures) {
+      throw new InvariantViolationError({
+        message: "Exhausted preparation failure budget must transition to dead_letter",
+        resourceRef: { kind: "delivery", id: delivery.deliveryId }
+      });
+    }
+    if (isStartedOutcome && nextAttemptCount >= delivery.maximumAttempts) {
+      throw new InvariantViolationError({
+        message: "Exhausted maximum send attempts must transition to dead_letter",
+        resourceRef: { kind: "delivery", id: delivery.deliveryId }
+      });
+    }
     if (ctx.nextEligibleAt === undefined) {
       throw new ValidationDomainError({
         code: "INVALID_TIMESTAMP",
         message: "retry_wait transition requires nextEligibleAt",
+        resourceRef: { kind: "delivery", id: delivery.deliveryId }
+      });
+    }
+    if (compareInstants(ctx.nextEligibleAt, ctx.decidedAt) < 0) {
+      throw new ValidationDomainError({
+        code: "INVALID_TIMESTAMP",
+        message: "retry_wait nextEligibleAt cannot be earlier than decidedAt",
         resourceRef: { kind: "delivery", id: delivery.deliveryId }
       });
     }
@@ -297,6 +316,13 @@ export function finalizeDeliveryAttempt(
       preparationFailureCount: nextPrepFailures,
       currentAttemptId: null,
       nextEligibleAt: ctx.nextEligibleAt
+    });
+  }
+
+  if (ctx.targetState === "expired" && compareInstants(ctx.decidedAt, delivery.deadlineAt) < 0) {
+    throw new InvariantViolationError({
+      message: "Cannot mark delivery expired before deadlineAt",
+      resourceRef: { kind: "delivery", id: delivery.deliveryId }
     });
   }
 

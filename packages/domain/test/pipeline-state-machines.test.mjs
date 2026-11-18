@@ -281,6 +281,8 @@ test("Event, Outbox, Publication, and Recovery Episode enforce fencing and recov
   const fifth = allocateOutboxRecoveryGeneration(outbox, pub, episode, cursorTime);
   assert.equal(fifth.episode.state, "review_required");
   assert.equal(fifth.outbox.state, "blocked");
+  assert.equal(fifth.nextPublication, null);
+  assert.equal(fifth.outbox.currentPublicationGeneration, outbox.currentPublicationGeneration);
   assert.throws(
     () =>
       allocateOutboxRecoveryGeneration(
@@ -291,6 +293,24 @@ test("Event, Outbox, Publication, and Recovery Episode enforce fencing and recov
       ),
     UnsupportedStateTransitionError
   );
+
+  // Terminal recovery episodes reject progress mutations regardless of completed flag
+  assert.throws(
+    () => recordRecoveryEpisodeProgress({ ...fifth.episode, state: "completed" }, false),
+    UnsupportedStateTransitionError
+  );
+  assert.throws(
+    () => recordRecoveryEpisodeProgress({ ...fifth.episode, state: "revoked" }, false),
+    UnsupportedStateTransitionError
+  );
+  assert.throws(
+    () => recordRecoveryEpisodeProgress({ ...fifth.episode, state: "revoked" }, true),
+    UnsupportedStateTransitionError
+  );
+
+  const reviewReset = recordRecoveryEpisodeProgress(fifth.episode, false);
+  assert.equal(reviewReset.state, "review_required");
+  assert.equal(reviewReset.successiveNoProgressGenerations, 0);
 
   const resetEpisode = recordRecoveryEpisodeProgress(
     { ...fifth.episode, state: "active" },
@@ -476,6 +496,90 @@ test("Delivery buckets, Attempt counters, Late observations, and Replay seed inv
   assert.equal(replay.newDelivery.deliveryGeneration, 1n);
   assert.equal(replay.newDelivery.state, "pending");
   assert.equal(replay.nextFamily.nextGeneration, 2n);
+
+  // finalizeDeliveryAttempt enforces retry_wait ceilings and expired deadline guard
+  const sendingPrepExhausted = {
+    ...sending,
+    preparationFailureCount: 23,
+    currentFence: 10n
+  };
+  assert.throws(
+    () =>
+      finalizeDeliveryAttempt(sendingPrepExhausted, {
+        attemptId: ATTEMPT_ID,
+        expectedFence: 10n,
+        attemptState: "failed_before_send",
+        targetState: "retry_wait",
+        decidedAt: addSeconds(T0, 5),
+        nextEligibleAt: addSeconds(T0, 10)
+      }),
+    InvariantViolationError
+  );
+
+  const sendingAttemptExhausted = {
+    ...sending,
+    attemptCount: 11,
+    maximumAttempts: 12,
+    currentFence: 10n
+  };
+  assert.throws(
+    () =>
+      finalizeDeliveryAttempt(sendingAttemptExhausted, {
+        attemptId: ATTEMPT_ID,
+        expectedFence: 10n,
+        attemptState: "transport_unknown",
+        targetState: "retry_wait",
+        decidedAt: addSeconds(T0, 5),
+        nextEligibleAt: addSeconds(T0, 10)
+      }),
+    InvariantViolationError
+  );
+
+  assert.throws(
+    () =>
+      finalizeDeliveryAttempt(sending, {
+        attemptId: ATTEMPT_ID,
+        expectedFence: 1n,
+        attemptState: "transport_unknown",
+        targetState: "retry_wait",
+        decidedAt: addSeconds(T0, 10),
+        nextEligibleAt: addSeconds(T0, 5)
+      }),
+    ValidationDomainError
+  );
+
+  assert.throws(
+    () =>
+      finalizeDeliveryAttempt(sending, {
+        attemptId: ATTEMPT_ID,
+        expectedFence: 1n,
+        attemptState: "transport_unknown",
+        targetState: "expired",
+        decidedAt: addSeconds(T0, 10)
+      }),
+    InvariantViolationError
+  );
+
+  const validRetryWait = finalizeDeliveryAttempt(sending, {
+    attemptId: ATTEMPT_ID,
+    expectedFence: 1n,
+    attemptState: "transport_unknown",
+    targetState: "retry_wait",
+    decidedAt: addSeconds(T0, 5),
+    nextEligibleAt: addSeconds(T0, 10)
+  });
+  assert.equal(validRetryWait.state, "retry_wait");
+  assert.equal(validRetryWait.attemptCount, 1);
+
+  const validExpired = finalizeDeliveryAttempt(sending, {
+    attemptId: ATTEMPT_ID,
+    expectedFence: 1n,
+    attemptState: "transport_unknown",
+    targetState: "expired",
+    decidedAt: baseDelivery.deadlineAt
+  });
+  assert.equal(validExpired.state, "expired");
+  assert.equal(validExpired.terminalAt?.equals(baseDelivery.deadlineAt), true);
 });
 
 test("LocalInvocation enforces monotonic continuity, cutoff math, and terminal exceptions", () => {
@@ -485,7 +589,13 @@ test("LocalInvocation enforces monotonic continuity, cutoff math, and terminal e
     fencingToken: 1n,
     controlEpoch: EPOCH
   };
-  const inv0 = { owner, state: "permission_pending", m0Ns: 1_000_000_000n, localCutoffNs: null };
+  const inv0 = {
+    owner,
+    state: "permission_pending",
+    m0Ns: 1_000_000_000n,
+    m1Ns: null,
+    localCutoffNs: null
+  };
 
   // Negative monotonic jump -> unusable
   const badClock = resolveLocalInvocationPermission(inv0, {
@@ -519,6 +629,11 @@ test("LocalInvocation enforces monotonic continuity, cutoff math, and terminal e
     acceptanceDbClock: T0
   });
   assert.equal(accepted.state, "permission_accepted");
+  assert.equal(accepted.m1Ns, 1_500_000_000n);
+
+  // Post-M1 backward monotonic clock jump (m0Ns <= now < m1Ns) fails closed to unusable
+  const postM1Regression = enterLocalInvocation(accepted, owner, 1_200_000_000n, true);
+  assert.equal(postM1Regression.state, "unusable");
 
   const invoking = enterLocalInvocation(accepted, owner, 2_000_000_000n, true);
   assert.equal(invoking.state, "invoking");
@@ -659,6 +774,17 @@ test("Circuit enforces 5-failure threshold, generation fencing, probe backoff, a
   }).circuit;
   assert.equal(circuit.consecutiveTransientFailures, 0);
 
+  // closed + permanent_policy_or_security stays closed without incrementing failures
+  const closedPolicy = applyCircuitObservation(circuit, {
+    circuitGenerationAtStart: 1n,
+    attemptId: ATTEMPT_ID,
+    decidedAt: addSeconds(T0, 5),
+    outcomeClass: "permanent_policy_or_security"
+  });
+  assert.equal(closedPolicy.applied, false);
+  assert.equal(closedPolicy.circuit.state, "closed");
+  assert.equal(closedPolicy.circuit.consecutiveTransientFailures, 0);
+
   // 5 consecutive transient failures open the circuit for 60s
   for (let i = 0; i < 5; i += 1) {
     circuit = applyCircuitObservation(circuit, {
@@ -693,10 +819,41 @@ test("Circuit enforces 5-failure threshold, generation fencing, probe backoff, a
   assert.equal(halfOpen.state, "half_open");
   assert.equal(halfOpen.probeGeneration, 1n);
 
+  const OTHER_INSTANCE_ID = parseRuntimeInstanceId("00000000-0000-4000-8000-0000000000f1");
+  const OTHER_EPOCH = parseControlEpoch("00000000-0000-4000-8000-0000000000f2");
+
+  // Mismatched owner/epoch cannot defer or observe half-open probe
+  assert.throws(
+    () =>
+      deferUnstartedCircuitProbe(halfOpen, {
+        expectedCircuitGeneration: 2n,
+        expectedProbeGeneration: 1n,
+        probeAttemptId: ATTEMPT_ID,
+        ownerInstanceId: OTHER_INSTANCE_ID,
+        controlEpoch: EPOCH,
+        decidedAt: addSeconds(T0, 75)
+      }),
+    ConflictDomainError
+  );
+  assert.equal(
+    applyCircuitObservation(halfOpen, {
+      circuitGenerationAtStart: 2n,
+      probeGenerationAtStart: 1n,
+      attemptId: ATTEMPT_ID,
+      ownerInstanceId: INSTANCE_ID,
+      controlEpoch: OTHER_EPOCH,
+      decidedAt: addSeconds(T0, 75),
+      outcomeClass: "acknowledged"
+    }).applied,
+    false
+  );
+
   const deferredOpen = deferUnstartedCircuitProbe(halfOpen, {
     expectedCircuitGeneration: 2n,
     expectedProbeGeneration: 1n,
     probeAttemptId: ATTEMPT_ID,
+    ownerInstanceId: INSTANCE_ID,
+    controlEpoch: EPOCH,
     decidedAt: addSeconds(T0, 75)
   });
   assert.equal(deferredOpen.state, "open");
@@ -716,6 +873,8 @@ test("Circuit enforces 5-failure threshold, generation fencing, probe backoff, a
     circuitGenerationAtStart: 2n,
     probeGenerationAtStart: 2n,
     attemptId: ATTEMPT_ID,
+    ownerInstanceId: INSTANCE_ID,
+    controlEpoch: EPOCH,
     decidedAt: addSeconds(T0, 77),
     outcomeClass: "permanent_http"
   });
@@ -723,8 +882,8 @@ test("Circuit enforces 5-failure threshold, generation fencing, probe backoff, a
   assert.equal(reopened.circuit.reopenCount, 1);
   assert.equal(reopened.circuit.reopenNotBefore?.equals(addSeconds(T0, 197)), true);
 
-  // Recovery to closed never clears endpoint security quarantine
-  const halfOpen3 = claimCircuitProbe(reopened.circuit, {
+  // half_open + permanent_policy_or_security reopens conservatively instead of wedging half_open
+  const halfOpenPolicy = claimCircuitProbe(reopened.circuit, {
     probeAttemptId: ATTEMPT_ID,
     probeOwnerInstanceId: INSTANCE_ID,
     probeControlEpoch: EPOCH,
@@ -732,11 +891,41 @@ test("Circuit enforces 5-failure threshold, generation fencing, probe backoff, a
     deliveryDeadlineAt: addSeconds(T0, 3600),
     now: addSeconds(T0, 197)
   });
+  const reopenedPolicy = applyCircuitObservation(halfOpenPolicy, {
+    circuitGenerationAtStart: halfOpenPolicy.circuitGeneration,
+    probeGenerationAtStart: halfOpenPolicy.probeGeneration,
+    attemptId: ATTEMPT_ID,
+    ownerInstanceId: INSTANCE_ID,
+    controlEpoch: EPOCH,
+    decidedAt: addSeconds(T0, 198),
+    outcomeClass: "permanent_policy_or_security"
+  });
+  assert.equal(reopenedPolicy.applied, true);
+  assert.equal(reopenedPolicy.circuit.state, "open");
+  assert.equal(reopenedPolicy.circuit.circuitGeneration, halfOpenPolicy.circuitGeneration + 1n);
+  assert.equal(reopenedPolicy.circuit.reopenCount, 2);
+  assert.equal(reopenedPolicy.circuit.probeAttemptId, null);
+  assert.equal(reopenedPolicy.circuit.probeOwnerInstanceId, null);
+  assert.equal(reopenedPolicy.circuit.probeControlEpoch, null);
+  assert.equal(reopenedPolicy.circuit.probeExpiresAt, null);
+  assert.equal(reopenedPolicy.circuit.reopenNotBefore?.equals(addSeconds(T0, 438)), true);
+
+  // Recovery to closed never clears endpoint security quarantine
+  const halfOpen3 = claimCircuitProbe(reopenedPolicy.circuit, {
+    probeAttemptId: ATTEMPT_ID,
+    probeOwnerInstanceId: INSTANCE_ID,
+    probeControlEpoch: EPOCH,
+    claimExpiresAt: addSeconds(T0, 468),
+    deliveryDeadlineAt: addSeconds(T0, 3600),
+    now: addSeconds(T0, 438)
+  });
   const closedAgain = applyCircuitObservation(halfOpen3, {
     circuitGenerationAtStart: halfOpen3.circuitGeneration,
     probeGenerationAtStart: halfOpen3.probeGeneration,
     attemptId: ATTEMPT_ID,
-    decidedAt: addSeconds(T0, 198),
+    ownerInstanceId: INSTANCE_ID,
+    controlEpoch: EPOCH,
+    decidedAt: addSeconds(T0, 439),
     outcomeClass: "acknowledged"
   });
   assert.equal(closedAgain.circuit.state, "closed");

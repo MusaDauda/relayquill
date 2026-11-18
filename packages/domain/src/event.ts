@@ -456,7 +456,7 @@ export function allocateOutboxRecoveryGeneration(
 ): {
   readonly outbox: OutboxSnapshot;
   readonly supersededPublication: PublicationSnapshot;
-  readonly nextPublication: PublicationSnapshot;
+  readonly nextPublication: PublicationSnapshot | null;
   readonly episode: PublicationRecoveryEpisodeSnapshot;
 } {
   if (episode.outboxId !== outbox.outboxId || currentPublication.outboxId !== outbox.outboxId) {
@@ -487,13 +487,15 @@ export function allocateOutboxRecoveryGeneration(
   }
 
   const nextNoProgressCount = episode.successiveNoProgressGenerations + 1;
-  const nextEpisodeState: PublicationRecoveryEpisodeState =
-    nextNoProgressCount >= MAX_NO_PROGRESS_RECOVERY_GENERATIONS
-      ? "review_required"
-      : "active";
+  const requiresReview = nextNoProgressCount >= MAX_NO_PROGRESS_RECOVERY_GENERATIONS;
+  const nextEpisodeState: PublicationRecoveryEpisodeState = requiresReview
+    ? "review_required"
+    : "active";
 
-  const nextGeneration = outbox.currentPublicationGeneration + 1n;
-  const nextOutboxState: OutboxState = nextEpisodeState === "review_required" ? "blocked" : "pending";
+  const nextGeneration = requiresReview
+    ? outbox.currentPublicationGeneration
+    : outbox.currentPublicationGeneration + 1n;
+  const nextOutboxState: OutboxState = requiresReview ? "blocked" : "pending";
 
   if (outbox.state !== "published" && outbox.state !== "blocked" && outbox.state !== "pending") {
     throw new UnsupportedStateTransitionError({
@@ -510,7 +512,7 @@ export function allocateOutboxRecoveryGeneration(
     { kind: "outbox", id: outbox.outboxId }
   );
 
-  if (nextEpisodeState !== "active") {
+  if (requiresReview) {
     assertTransition(
       "publication_recovery_episode",
       ALLOWED_PUBLICATION_RECOVERY_EPISODE_TRANSITIONS,
@@ -519,6 +521,20 @@ export function allocateOutboxRecoveryGeneration(
       { kind: "publication_recovery_episode", id: episode.episodeId }
     );
   }
+
+  const nextPublication: PublicationSnapshot | null = requiresReview
+    ? null
+    : Object.freeze({
+        outboxId: outbox.outboxId,
+        publicationGeneration: nextGeneration,
+        state: "prepared",
+        brokerMessageId: formatBrokerMessageId(outbox.outboxId, nextGeneration),
+        sendCount: 0,
+        firstBrokerGenerationId: null,
+        firstObservationId: null,
+        streamSequence: null,
+        ackObservedAt: null
+      });
 
   return Object.freeze({
     outbox: Object.freeze({
@@ -529,26 +545,15 @@ export function allocateOutboxRecoveryGeneration(
       claimControlEpoch: null,
       claimExpiresAt: null,
       nextPublishAt: now,
-      lastSafeErrorCode:
-        nextEpisodeState === "review_required"
-          ? "RECOVERY_NO_PROGRESS_THRESHOLD"
-          : outbox.lastSafeErrorCode
+      lastSafeErrorCode: requiresReview
+        ? "RECOVERY_NO_PROGRESS_THRESHOLD"
+        : outbox.lastSafeErrorCode
     }),
     supersededPublication: Object.freeze({
       ...currentPublication,
       state: "recovery_superseded"
     }),
-    nextPublication: Object.freeze({
-      outboxId: outbox.outboxId,
-      publicationGeneration: nextGeneration,
-      state: "prepared",
-      brokerMessageId: formatBrokerMessageId(outbox.outboxId, nextGeneration),
-      sendCount: 0,
-      firstBrokerGenerationId: null,
-      firstObservationId: null,
-      streamSequence: null,
-      ackObservedAt: null
-    }),
+    nextPublication,
     episode: Object.freeze({
       ...episode,
       state: nextEpisodeState,
@@ -562,6 +567,13 @@ export function recordRecoveryEpisodeProgress(
   episode: PublicationRecoveryEpisodeSnapshot,
   completed: boolean
 ): PublicationRecoveryEpisodeSnapshot {
+  if (episode.state !== "active" && episode.state !== "review_required") {
+    throw new UnsupportedStateTransitionError({
+      code: "STATE_TRANSITION_NOT_ALLOWED",
+      message: `Cannot record recovery episode progress in terminal state "${episode.state}"`,
+      resourceRef: { kind: "publication_recovery_episode", id: episode.episodeId }
+    });
+  }
   if (completed) {
     assertTransition(
       "publication_recovery_episode",

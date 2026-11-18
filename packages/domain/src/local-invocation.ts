@@ -51,6 +51,7 @@ export interface LocalInvocationSnapshot {
   readonly owner: LocalInvocationOwner;
   readonly state: LocalInvocationState;
   readonly m0Ns: bigint;
+  readonly m1Ns: bigint | null;
   readonly localCutoffNs: bigint | null;
 }
 
@@ -166,6 +167,7 @@ export function resolveLocalInvocationPermission(
     return Object.freeze({
       ...snapshot,
       state: cutoff.terminalState,
+      m1Ns: input.m1Ns,
       localCutoffNs: null
     });
   }
@@ -173,6 +175,7 @@ export function resolveLocalInvocationPermission(
   return Object.freeze({
     ...snapshot,
     state: "permission_accepted",
+    m1Ns: input.m1Ns,
     localCutoffNs: cutoff.localCutoffNs
   });
 }
@@ -199,7 +202,7 @@ export function enterLocalInvocation(
       state: "aborted"
     });
   }
-  if (nowMonotonicNs < snapshot.m0Ns) {
+  if (nowMonotonicNs < snapshot.m0Ns || nowMonotonicNs < (snapshot.m1Ns ?? snapshot.m0Ns)) {
     return Object.freeze({
       ...snapshot,
       state: "unusable"

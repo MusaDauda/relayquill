@@ -250,6 +250,12 @@ export function assertContinuePublicationEpisodeAllowed(
   }
 }
 
+const RECOVERY_SCOPE_RANK: Readonly<Record<RecoveryScopeKind, number>> = Object.freeze({
+  project: 1,
+  tenant: 2,
+  installation: 3
+});
+
 export function assertSetRecoveryGateAllowed(input: {
   readonly planScopeKind: RecoveryScopeKind;
   readonly targetScopeKind: RecoveryScopeKind;
@@ -263,6 +269,12 @@ export function assertSetRecoveryGateAllowed(input: {
     throw new AuthorizationDomainError({
       code: "FORBIDDEN",
       message: "A project-scoped recovery plan cannot reopen installation-wide allow_send"
+    });
+  }
+  if (RECOVERY_SCOPE_RANK[input.planScopeKind] < RECOVERY_SCOPE_RANK[input.targetScopeKind]) {
+    throw new AuthorizationDomainError({
+      code: "FORBIDDEN",
+      message: `A ${input.planScopeKind}-scoped recovery plan cannot target a ${input.targetScopeKind}-scoped recovery gate`
     });
   }
 }

@@ -2,7 +2,9 @@ import { ValidationDomainError } from "./errors.js";
 
 declare const brandTag: unique symbol;
 
-export type Brand<T, B extends string> = T & { readonly [brandTag]: B };
+export type Brand<T, B extends string> = T & {
+  readonly [brandTag]: { readonly [K in B]: true };
+};
 
 export type CanonicalUuid = Brand<string, "CanonicalUuid">;
 

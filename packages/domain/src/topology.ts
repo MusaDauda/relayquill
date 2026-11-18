@@ -163,7 +163,7 @@ export const ALLOWED_SUBSCRIPTION_TRANSITIONS: TransitionMatrix<SubscriptionStat
   draft: ["active", "retired"],
   active: ["paused", "quarantined", "retired"],
   paused: ["active", "quarantined", "retired"],
-  quarantined: ["paused", "active", "retired"],
+  quarantined: ["paused", "retired"],
   retired: []
 });
 
@@ -264,9 +264,16 @@ export interface SigningPolicySnapshot {
 
 export function assertSigningPolicyInvariants(policy: SigningPolicySnapshot): void {
   if (policy.signatureMode === "primary_only") {
-    if (policy.overlapKeyVersionId !== null) {
+    if (
+      policy.overlapKeyVersionId !== null ||
+      policy.overlapStartedAt !== null ||
+      policy.overlapEndsAt !== null ||
+      policy.oldKeySignUntil !== null ||
+      policy.oldKeyVerifyUntil !== null
+    ) {
       throw new InvariantViolationError({
-        message: "primary_only signing policy must not set overlapKeyVersionId"
+        message:
+          "primary_only signing policy must not set overlapKeyVersionId or overlap/cutoff timestamps"
       });
     }
     return;
@@ -296,6 +303,24 @@ export function assertSigningPolicyInvariants(policy: SigningPolicySnapshot): vo
     throw new ValidationDomainError({
       code: "INVALID_VALUE",
       message: `Signing overlap window must be within (0, ${SIGNING_OVERLAP_MAX_MS.toString(10)}ms]`
+    });
+  }
+
+  if (compareInstants(policy.oldKeySignUntil, policy.overlapStartedAt) < 0) {
+    throw new InvariantViolationError({
+      message: "bounded_dual_signature requires old.sign_until >= overlap_started_at"
+    });
+  }
+
+  if (compareInstants(policy.oldKeyVerifyUntil, policy.overlapStartedAt) <= 0) {
+    throw new InvariantViolationError({
+      message: "bounded_dual_signature requires old.verify_until > overlap_started_at"
+    });
+  }
+
+  if (compareInstants(policy.oldKeyVerifyUntil, policy.overlapEndsAt) > 0) {
+    throw new InvariantViolationError({
+      message: "bounded_dual_signature requires old.verify_until <= overlap_ends_at"
     });
   }
 
@@ -387,10 +412,10 @@ export function applySubscriptionControlAction(
       nextSendHold = true;
       break;
     case "release_send_hold":
-      if (sub.state === "retired") {
+      if (sub.state === "retired" || sub.state === "quarantined") {
         throw new ConflictDomainError({
           code: "STATE_TRANSITION_NOT_ALLOWED",
-          message: "Cannot release send hold on a retired subscription",
+          message: `Cannot release send hold on a ${sub.state} subscription`,
           resourceRef: { kind: "subscription", id: sub.subscriptionId }
         });
       }

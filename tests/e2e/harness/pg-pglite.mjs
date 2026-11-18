@@ -171,14 +171,23 @@ async function createLivePgHarness(pgUrl, options) {
     throw new Error(`Unsupported pg-pglite mode: ${mode}`);
   }
 
+  const safeAuthorities = authorities.map((name) => ({
+    name,
+    safeName: assertSafeIdentifier(name)
+  }));
+
   const pgUrls = options.pgUrls ?? null;
   if (mode === 'separate_databases') {
-    const missing = authorities.filter((name) => !pgUrls?.[name] || !String(pgUrls[name]).trim());
+    const missing = safeAuthorities
+      .map(({ name }) => name)
+      .filter((name) => !pgUrls?.[name] || !String(pgUrls[name]).trim());
     if (missing.length > 0) {
       throw new Error(
         `Live PostgreSQL separate_databases mode requires per-authority pgUrls for [${missing.join(', ')}] to avoid public schema collision`
       );
     }
+  } else if (!pgUrl) {
+    throw new Error('Live PostgreSQL shared_database_schemas mode requires a non-empty pgUrl');
   }
 
   let pgMod;
@@ -201,64 +210,59 @@ async function createLivePgHarness(pgUrl, options) {
   types.setTypeParser(1114, EXACT_PG_PARSERS[1114]);
   types.setTypeParser(20, EXACT_PG_PARSERS[20]);
 
+  const basePoolConfig = {
+    ...(options.poolOptions ?? {}),
+    ...(options.connectionTimeoutMillis !== undefined
+      ? { connectionTimeoutMillis: options.connectionTimeoutMillis }
+      : {})
+  };
+
   const pools = [];
-  const sharedPool = mode === 'shared_database_schemas' ? new Pool({ connectionString: pgUrl }) : null;
-  if (sharedPool) {
-    pools.push(sharedPool);
-    await sharedPool.query('CREATE EXTENSION IF NOT EXISTS btree_gist;');
-  }
+  const closePoolsBestEffort = async () => {
+    for (const pool of pools) {
+      await pool.end().catch(() => {});
+    }
+  };
 
   const dbs = {};
-  for (const name of authorities) {
-    const safeName = assertSafeIdentifier(name);
-    let authorityPool = sharedPool;
-    if (mode === 'separate_databases') {
-      authorityPool = new Pool({ connectionString: String(pgUrls[name]).trim() });
-      pools.push(authorityPool);
-      await authorityPool.query('CREATE EXTENSION IF NOT EXISTS btree_gist;');
-    } else {
-      await authorityPool.query(`CREATE SCHEMA IF NOT EXISTS ${safeName};`);
+  try {
+    const sharedPool = mode === 'shared_database_schemas'
+      ? new Pool({ ...basePoolConfig, connectionString: pgUrl })
+      : null;
+    if (sharedPool) {
+      sharedPool.on('error', () => {});
+      pools.push(sharedPool);
+      await sharedPool.query('CREATE EXTENSION IF NOT EXISTS btree_gist;');
     }
 
-    dbs[name] = {
-      kind: 'pg',
-      schema: mode === 'shared_database_schemas' ? safeName : 'public',
-      raw: authorityPool,
-      async query(sql, params = []) {
-        const client = await authorityPool.connect();
-        try {
-          await client.query('BEGIN');
-          if (mode === 'shared_database_schemas') {
-            await client.query(`SET LOCAL search_path TO ${safeName}, public`);
-          }
-          const result = await client.query(sql, params);
-          await client.query('COMMIT');
-          return result;
-        } catch (err) {
-          try {
-            await client.query('ROLLBACK');
-          } catch {
-            // Ignore rollback errors after failed statement.
-          }
-          throw err;
-        } finally {
-          client.release();
-        }
-      },
-      async exec(sql) {
-        return this.query(sql);
-      },
-      async withTransaction(fn, opts = {}) {
-        const executeTx = async () => {
+    for (const { name, safeName } of safeAuthorities) {
+      let authorityPool = sharedPool;
+      if (mode === 'separate_databases') {
+        authorityPool = new Pool({
+          ...basePoolConfig,
+          connectionString: String(pgUrls[name]).trim()
+        });
+        authorityPool.on('error', () => {});
+        pools.push(authorityPool);
+        await authorityPool.query('CREATE EXTENSION IF NOT EXISTS btree_gist;');
+      } else {
+        await authorityPool.query(`CREATE SCHEMA IF NOT EXISTS ${safeName};`);
+      }
+
+      dbs[name] = {
+        kind: 'pg',
+        schema: mode === 'shared_database_schemas' ? safeName : 'public',
+        raw: authorityPool,
+        async query(sql, params = []) {
           const client = await authorityPool.connect();
           try {
             await client.query('BEGIN');
             if (mode === 'shared_database_schemas') {
               await client.query(`SET LOCAL search_path TO ${safeName}, public`);
             }
-            const res = await fn(client);
+            const result = await client.query(sql, params);
             await client.query('COMMIT');
-            return res;
+            return result;
           } catch (err) {
             try {
               await client.query('ROLLBACK');
@@ -269,14 +273,45 @@ async function createLivePgHarness(pgUrl, options) {
           } finally {
             client.release();
           }
-        };
-        if (opts.retryOnContention) {
-          return withRetryOnContention(executeTx, opts);
+        },
+        async exec(sql) {
+          return this.query(sql);
+        },
+        async withTransaction(fn, opts = {}) {
+          const executeTx = async () => {
+            const client = await authorityPool.connect();
+            try {
+              await client.query('BEGIN');
+              if (mode === 'shared_database_schemas') {
+                await client.query(`SET LOCAL search_path TO ${safeName}, public`);
+              }
+              const res = await fn(client);
+              await client.query('COMMIT');
+              return res;
+            } catch (err) {
+              try {
+                await client.query('ROLLBACK');
+              } catch {
+                // Ignore rollback errors after failed statement.
+              }
+              throw err;
+            } finally {
+              client.release();
+            }
+          };
+          if (opts.retryOnContention) {
+            return withRetryOnContention(executeTx, opts);
+          }
+          return executeTx();
         }
-        return executeTx();
-      }
-    };
+      };
+    }
+  } catch (err) {
+    await closePoolsBestEffort();
+    throw err;
   }
+
+  let cleanedUp = false;
 
   return {
     mode,
@@ -287,8 +322,20 @@ async function createLivePgHarness(pgUrl, options) {
     createContentionFaultInjector,
     withRetryOnContention,
     async cleanup() {
+      if (cleanedUp) {
+        return;
+      }
+      cleanedUp = true;
+      const errors = [];
       for (const pool of pools) {
-        await pool.end();
+        try {
+          await pool.end();
+        } catch (err) {
+          errors.push(err);
+        }
+      }
+      if (errors.length > 0) {
+        throw new AggregateError(errors, 'Failed to close PostgreSQL pools cleanly');
       }
     }
   };
@@ -306,34 +353,46 @@ export async function createPgHarness(options = {}) {
   }
 
   const authorities = options.authorities ?? AUTHORITY_NAMES;
+  const safeAuthorities = authorities.map((name) => ({
+    name,
+    safeName: assertSafeIdentifier(name)
+  }));
   const instances = [];
   const dbs = {};
 
-  if (mode === 'separate_databases') {
-    for (const name of authorities) {
-      const db = await PGlite.create({
+  try {
+    if (mode === 'separate_databases') {
+      for (const { name } of safeAuthorities) {
+        const db = await PGlite.create({
+          dataDir: 'memory://',
+          extensions: { btree_gist },
+          parsers: EXACT_PG_PARSERS
+        });
+        instances.push(db);
+        await db.exec('CREATE EXTENSION IF NOT EXISTS btree_gist;');
+        dbs[name] = wrapPgliteAuthority(db, null);
+      }
+    } else {
+      const sharedDb = await PGlite.create({
         dataDir: 'memory://',
         extensions: { btree_gist },
         parsers: EXACT_PG_PARSERS
       });
-      await db.exec('CREATE EXTENSION IF NOT EXISTS btree_gist;');
-      instances.push(db);
-      dbs[name] = wrapPgliteAuthority(db, null);
-    }
-  } else {
-    const sharedDb = await PGlite.create({
-      dataDir: 'memory://',
-      extensions: { btree_gist },
-      parsers: EXACT_PG_PARSERS
-    });
-    await sharedDb.exec('CREATE EXTENSION IF NOT EXISTS btree_gist;');
-    instances.push(sharedDb);
+      instances.push(sharedDb);
+      await sharedDb.exec('CREATE EXTENSION IF NOT EXISTS btree_gist;');
 
-    for (const name of authorities) {
-      const safeName = assertSafeIdentifier(name);
-      await sharedDb.exec(`CREATE SCHEMA IF NOT EXISTS ${safeName};`);
-      dbs[name] = wrapPgliteAuthority(sharedDb, safeName);
+      for (const { name, safeName } of safeAuthorities) {
+        await sharedDb.exec(`CREATE SCHEMA IF NOT EXISTS ${safeName};`);
+        dbs[name] = wrapPgliteAuthority(sharedDb, safeName);
+      }
     }
+  } catch (err) {
+    for (const db of instances) {
+      if (!db.closed) {
+        await db.close().catch(() => {});
+      }
+    }
+    throw err;
   }
 
   return {

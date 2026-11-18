@@ -471,8 +471,16 @@ export class InMemoryJetStreamBroker {
 }
 
 export async function launchEmbeddedGoBroker(options = {}) {
-  const launcherDir = path.join(repoRoot, 'tools', 'broker-launcher');
-  const mainGoPath = path.join(launcherDir, 'cmd', 'relayquill-broker', 'main.go');
+  if (options.disableBinaryLookup) {
+    return {
+      available: false,
+      reason: 'Embedded Go broker lookup disabled',
+      async cleanup() {}
+    };
+  }
+
+  const launcherDir = options.launcherDir ?? path.join(repoRoot, 'tools', 'broker-launcher');
+  const mainGoPath = options.mainGoPath ?? path.join(launcherDir, 'cmd', 'relayquill-broker', 'main.go');
   const binName = process.platform === 'win32' ? 'relayquill-broker.exe' : 'relayquill-broker';
   const prebuiltBin = options.binaryPath ?? path.join(launcherDir, binName);
 
@@ -499,17 +507,46 @@ export async function launchEmbeddedGoBroker(options = {}) {
     stdio: ['ignore', 'pipe', 'pipe']
   });
 
+  const stdoutChunks = [];
+  const stderrChunks = [];
   const logs = [];
-  child.stdout?.on('data', (chunk) => logs.push(chunk.toString('utf8')));
-  child.stderr?.on('data', (chunk) => logs.push(chunk.toString('utf8')));
+  child.stdout?.on('data', (chunk) => {
+    const text = chunk.toString('utf8');
+    stdoutChunks.push(text);
+    logs.push(text);
+  });
+  child.stderr?.on('data', (chunk) => {
+    const text = chunk.toString('utf8');
+    stderrChunks.push(text);
+    logs.push(text);
+  });
+
+  let closed = false;
+  let spawnErr = null;
+  const exitPromise = new Promise((resolve) => {
+    child.once('error', (err) => {
+      spawnErr = err;
+      closed = true;
+      logs.push(err instanceof Error ? err.message : String(err));
+      resolve({ code: null, signal: null, error: err });
+    });
+    child.once('close', (code, signal) => {
+      closed = true;
+      resolve({ code, signal, error: null });
+    });
+  });
 
   return {
     available: true,
     pid: child.pid,
     process: child,
+    getStdout: () => stdoutChunks.join(''),
+    getStderr: () => stderrChunks.join(''),
     getLogs: () => logs.join(''),
+    waitForExit: () => exitPromise,
     async cleanup() {
-      if (child.exitCode !== null || child.killed) {
+      if (closed || spawnErr || child.exitCode !== null || child.signalCode !== null) {
+        await exitPromise;
         return;
       }
       if (process.platform === 'win32' && command === 'go' && child.pid) {
@@ -527,15 +564,20 @@ export async function launchEmbeddedGoBroker(options = {}) {
           });
           killer.once('close', () => resolve());
         });
-        if (child.exitCode === null) {
-          await new Promise((resolve) => {
-            const timer = setTimeout(resolve, 1_000);
-            child.once('exit', () => {
-              clearTimeout(timer);
+        await new Promise((resolve) => {
+          let settled = false;
+          const finish = () => {
+            if (!settled) {
+              settled = true;
               resolve();
-            });
+            }
+          };
+          const timer = setTimeout(finish, 1_000);
+          exitPromise.then(() => {
+            clearTimeout(timer);
+            finish();
           });
-        }
+        });
         return;
       }
 
@@ -557,17 +599,24 @@ export async function launchEmbeddedGoBroker(options = {}) {
         // Ignore already-exited process.
       }
       await new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (!settled) {
+            settled = true;
+            resolve();
+          }
+        };
         const timer = setTimeout(() => {
           try {
             sendSignal('SIGKILL');
           } catch {
             // Ignore already-exited process.
           }
-          resolve();
+          finish();
         }, 2_000);
-        child.once('exit', () => {
+        exitPromise.then(() => {
           clearTimeout(timer);
-          resolve();
+          finish();
         });
       });
     }

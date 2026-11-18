@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 
@@ -30,7 +32,123 @@ import {
   sendIpcFrame
 } from './ipc-probe.mjs';
 import { createPgHarness } from './pg-pglite.mjs';
-import { createE2EStack } from './stack.mjs';
+import { allocateEphemeralPort, createE2EStack } from './stack.mjs';
+
+function encodePgMessage(typeByte, bodyBuf) {
+  const pkt = Buffer.allocUnsafe(5 + bodyBuf.length);
+  pkt[0] = typeByte;
+  pkt.writeInt32BE(4 + bodyBuf.length, 1);
+  bodyBuf.copy(pkt, 5);
+  return pkt;
+}
+
+async function startPgWireSetupFailureStub({ failOnQueryIndex = 1 } = {}) {
+  let queryCount = 0;
+  let openSockets = 0;
+  const socketClosedResolvers = [];
+
+  const server = net.createServer((socket) => {
+    openSockets += 1;
+    let buf = Buffer.alloc(0);
+    let started = false;
+
+    socket.on('close', () => {
+      openSockets -= 1;
+      if (openSockets === 0) {
+        while (socketClosedResolvers.length > 0) {
+          socketClosedResolvers.shift()();
+        }
+      }
+    });
+
+    socket.on('data', (chunk) => {
+      buf = Buffer.concat([buf, chunk]);
+      while (buf.length > 0) {
+        if (!started) {
+          if (buf.length < 8) {
+            return;
+          }
+          const len = buf.readInt32BE(0);
+          if (buf.length < len) {
+            return;
+          }
+          const code = buf.readInt32BE(4);
+          buf = buf.subarray(len);
+          if (code === 80877103) {
+            socket.write(Buffer.from('N', 'ascii'));
+            continue;
+          }
+          started = true;
+          const authOk = Buffer.from([0x52, 0, 0, 0, 8, 0, 0, 0, 0]);
+          const ready = Buffer.from([0x5a, 0, 0, 0, 5, 0x49]);
+          socket.write(Buffer.concat([authOk, ready]));
+          continue;
+        }
+
+        if (buf.length < 5) {
+          return;
+        }
+        const msgType = buf[0];
+        const msgLen = buf.readInt32BE(1);
+        if (buf.length < 1 + msgLen) {
+          return;
+        }
+        buf = buf.subarray(1 + msgLen);
+
+        if (msgType === 0x58) {
+          socket.end();
+          return;
+        }
+        if (msgType === 0x51) {
+          queryCount += 1;
+          const ready = Buffer.from([0x5a, 0, 0, 0, 5, 0x49]);
+          if (queryCount === failOnQueryIndex) {
+            const errBody = Buffer.concat([
+              Buffer.from('SERROR\0', 'utf8'),
+              Buffer.from('C42501\0', 'utf8'),
+              Buffer.from('Msimulated setup failure\0', 'utf8'),
+              Buffer.from([0])
+            ]);
+            socket.write(Buffer.concat([encodePgMessage(0x45, errBody), ready]));
+          } else {
+            const okBody = Buffer.from('CREATE\0', 'utf8');
+            socket.write(Buffer.concat([encodePgMessage(0x43, okBody), ready]));
+          }
+        }
+      }
+    });
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const addr = server.address();
+  const port = typeof addr === 'object' && addr ? addr.port : 0;
+
+  return {
+    port,
+    getQueryCount: () => queryCount,
+    getOpenSockets: () => openSockets,
+    waitAllSocketsClosed(timeoutMs = 1_000) {
+      if (openSockets === 0) {
+        return Promise.resolve();
+      }
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(new Error(`Timed out waiting for PG stub sockets to close (openSockets=${openSockets})`));
+        }, timeoutMs);
+        socketClosedResolvers.push(() => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+    },
+    async close() {
+      await new Promise((resolve) => server.close(() => resolve()));
+    }
+  };
+}
 
 describe('E2E Harness Smoke Suite', () => {
   it('pg-pglite: separate_databases, shared_database_schemas, btree_gist 23P01, exact OIDs, barrier & retry', async () => {
@@ -153,17 +271,65 @@ describe('E2E Harness Smoke Suite', () => {
       await shared.cleanup();
     }
 
+    const unreachablePort = await allocateEphemeralPort('127.0.0.1');
+    const unreachableUrl = `postgres://relayquill:invalid@127.0.0.1:${unreachablePort}/relayquill_test`;
+
     // Verify live PG separate_databases mode rejects missing per-authority pgUrls.
     await assert.rejects(
-      () => createPgHarness({ pgUrl: 'postgres://127.0.0.1:5432/relayquill_test', mode: 'separate_databases' }),
+      () => createPgHarness({ pgUrl: unreachableUrl, mode: 'separate_databases' }),
       /pgUrls/i
     );
 
-    // Verify optional live PG URL fails clearly when pg package is absent.
+    // Verify live PG shared_database_schemas mode rejects missing pgUrl.
     await assert.rejects(
-      () => createPgHarness({ pgUrl: 'postgres://127.0.0.1:5432/relayquill_test' }),
-      /pg/i
+      () => createPgHarness({
+        mode: 'shared_database_schemas',
+        pgUrls: { rq: unreachableUrl, rc: unreachableUrl, pi: unreachableUrl }
+      }),
+      /pgUrl/i
     );
+
+    // Verify live PG rejects cleanly against an unreachable port without touching 127.0.0.1:5432.
+    await assert.rejects(
+      () => createPgHarness({
+        pgUrl: unreachableUrl,
+        connectionTimeoutMillis: 1_000
+      }),
+      (err) => err?.code === 'ECONNREFUSED' || /ECONNREFUSED|connect|timeout/i.test(String(err?.message ?? err))
+    );
+
+    // Verify sharedPool is reliably closed when CREATE SCHEMA fails during initialization.
+    const sharedStub = await startPgWireSetupFailureStub({ failOnQueryIndex: 2 });
+    try {
+      await assert.rejects(
+        () => createPgHarness({
+          pgUrl: `postgres://relayquill:test@127.0.0.1:${sharedStub.port}/relayquill_test`,
+          mode: 'shared_database_schemas'
+        }),
+        (err) => err?.code === '42501'
+      );
+      await sharedStub.waitAllSocketsClosed(1_000);
+      assert.equal(sharedStub.getOpenSockets(), 0);
+    } finally {
+      await sharedStub.close();
+    }
+
+    // Verify authorityPools are reliably closed when CREATE EXTENSION fails on a subsequent authority.
+    const sepStub = await startPgWireSetupFailureStub({ failOnQueryIndex: 2 });
+    try {
+      const stubUrl = `postgres://relayquill:test@127.0.0.1:${sepStub.port}/relayquill_test`;
+      await assert.rejects(
+        () => createPgHarness({
+          mode: 'separate_databases',
+          pgUrls: { rq: stubUrl, rc: stubUrl, pi: stubUrl }
+        }),
+        (err) => err?.code === '42501'
+      );
+      await sepStub.waitAllSocketsClosed(1_000);
+      assert.equal(sepStub.getOpenSockets(), 0);
+    } finally {
+      await sepStub.close();
+    }
   });
 
   it('broker-harness: InMemoryJetStreamBroker limits, dedup, pull ack/nak/working/term & fault hooks', async () => {
@@ -275,10 +441,62 @@ describe('E2E Harness Smoke Suite', () => {
       assert.equal(expired, 3);
       assert.equal(broker.getStreamStats('RQ_DELIVERIES').messages, 0);
 
-      // Embedded Go launcher check does not crash when tools/broker-launcher is absent.
-      const goStatus = await launchEmbeddedGoBroker();
-      assert.equal(goStatus.available, false);
-      await goStatus.cleanup();
+      // Verify missing launcher directory and disabled lookup return available: false.
+      const missingLauncher = await launchEmbeddedGoBroker({
+        launcherDir: path.join(os.tmpdir(), `relayquill-missing-launcher-${process.pid}-${Date.now()}`)
+      });
+      try {
+        assert.equal(missingLauncher.available, false);
+        assert.match(missingLauncher.reason, /not yet present/i);
+      } finally {
+        await missingLauncher.cleanup();
+      }
+
+      const disabledLauncher = await launchEmbeddedGoBroker({
+        disableBinaryLookup: true
+      });
+      try {
+        assert.equal(disabledLauncher.available, false);
+        assert.match(disabledLauncher.reason, /disabled/i);
+      } finally {
+        await disabledLauncher.cleanup();
+      }
+
+      // Verify embedded Go launcher works cleanly when tools/broker-launcher exists (without hard-failing if absent).
+      const healthServer = http.createServer((_req, res) => {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end('{"status":"ok"}');
+      });
+      await new Promise((resolve, reject) => {
+        healthServer.once('error', reject);
+        healthServer.listen(0, '127.0.0.1', resolve);
+      });
+      const healthAddr = healthServer.address();
+      const healthPort = typeof healthAddr === 'object' && healthAddr ? healthAddr.port : 0;
+
+      const goStatus = await launchEmbeddedGoBroker({
+        args: [
+          'healthcheck',
+          '--url',
+          `http://127.0.0.1:${healthPort}/healthz?js-enabled-only=true`
+        ]
+      });
+      try {
+        if (goStatus.available) {
+          const exit = await goStatus.waitForExit();
+          assert.equal(
+            exit.code,
+            0,
+            `Embedded Go broker healthcheck failed (code=${exit.code}): ${goStatus.getLogs()}`
+          );
+          assert.match(goStatus.getStdout(), /"status"\s*:\s*"ok"/);
+        } else {
+          assert.equal(goStatus.available, false);
+        }
+      } finally {
+        await goStatus.cleanup();
+        await new Promise((resolve) => healthServer.close(() => resolve()));
+      }
     } finally {
       await broker.cleanup();
     }

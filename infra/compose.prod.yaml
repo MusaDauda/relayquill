@@ -1,0 +1,562 @@
+name: relayquill-prod
+
+# 100% self-hosted production Docker Compose topology:
+# - PostgreSQL 18 with TLS + SCRAM-SHA-256 + scoped roles (rq, rc, pi isolation)
+# - 3-node native-TLS Go/NATS JetStream quorum (relayquill-broker)
+# - Hardened Node 24 TypeScript workers (api, relay, fanout, sender, coordinator)
+# - Non-root Nginx static console + same-origin /api/ reverse proxy
+# Zero managed-service or cloud-vendor dependencies.
+
+networks:
+  edge:
+    driver: bridge
+  app_internal:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge
+
+volumes:
+  pg18_data:
+  broker_1_jetstream:
+  broker_2_jetstream:
+  broker_3_jetstream:
+
+secrets:
+  pg_superuser_password:
+    file: ./secrets/pg_superuser_password
+  pg_password_rq_api:
+    file: ./secrets/pg_password_rq_api
+  pg_password_rq_relay:
+    file: ./secrets/pg_password_rq_relay
+  pg_password_rq_fanout:
+    file: ./secrets/pg_password_rq_fanout
+  pg_password_rq_sender:
+    file: ./secrets/pg_password_rq_sender
+  pg_password_rq_coordinator:
+    file: ./secrets/pg_password_rq_coordinator
+  pg_password_rq_migrator:
+    file: ./secrets/pg_password_rq_migrator
+  pg_password_rq_reporter:
+    file: ./secrets/pg_password_rq_reporter
+  pg_password_rq_signing_issuer:
+    file: ./secrets/pg_password_rq_signing_issuer
+  pg_password_rq_recovery:
+    file: ./secrets/pg_password_rq_recovery
+  pg_password_receiver_migrator:
+    file: ./secrets/pg_password_receiver_migrator
+  pg_password_receiver_runtime:
+    file: ./secrets/pg_password_receiver_runtime
+  pg_password_provider_migrator:
+    file: ./secrets/pg_password_provider_migrator
+  pg_password_provider_runtime:
+    file: ./secrets/pg_password_provider_runtime
+  postgres_server_key:
+    file: ./secrets/certs/postgres-server.key
+  broker_1_server_key:
+    file: ./secrets/certs/broker-1-server.key
+  broker_1_route_key:
+    file: ./secrets/certs/broker-1-route.key
+  broker_2_server_key:
+    file: ./secrets/certs/broker-2-server.key
+  broker_2_route_key:
+    file: ./secrets/certs/broker-2-route.key
+  broker_3_server_key:
+    file: ./secrets/certs/broker-3-server.key
+  broker_3_route_key:
+    file: ./secrets/certs/broker-3-route.key
+  nats_rq_relay_nkey:
+    file: ./secrets/nats_rq_relay_nkey.seed
+  nats_rq_fanout_nkey:
+    file: ./secrets/nats_rq_fanout_nkey.seed
+  nats_rq_admin_nkey:
+    file: ./secrets/nats_rq_admin_nkey.seed
+  auth_session_hmac:
+    file: ./secrets/auth_session_hmac
+  endpoint_signing_keys:
+    file: ./secrets/endpoint_signing_keys
+
+services:
+  postgres:
+    image: postgres:18-bookworm
+    restart: unless-stopped
+    read_only: true
+    user: "999:999"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /var/run/postgresql:rw,noexec,nosuid,size=16m
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_superuser_password
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=peer"
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/postgres/certs/postgres-server.crt
+      - -c
+      - ssl_key_file=/run/secrets/postgres_server.key
+      - -c
+      - ssl_ca_file=/etc/relayquill/certs/postgres-ca.pem
+      - -c
+      - ssl_min_protocol_version=TLSv1.2
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - hba_file=/etc/postgres/pg_hba.conf
+    volumes:
+      - pg18_data:/var/lib/postgresql
+      - ./postgres/00-bootstrap-selfhosted.sh:/docker-entrypoint-initdb.d/00-bootstrap-selfhosted.sh:ro
+      - ./postgres/pg_hba-selfhosted.conf:/etc/postgres/pg_hba.conf:ro
+      - ./secrets/certs/postgres-ca.pem:/etc/relayquill/certs/postgres-ca.pem:ro
+      - ./secrets/certs/postgres-server.crt:/etc/postgres/certs/postgres-server.crt:ro
+    secrets:
+      - source: pg_superuser_password
+        target: pg_superuser_password
+      - source: postgres_server_key
+        target: postgres_server.key
+      - source: pg_password_rq_api
+        target: pg_password_rq_api
+      - source: pg_password_rq_relay
+        target: pg_password_rq_relay
+      - source: pg_password_rq_fanout
+        target: pg_password_rq_fanout
+      - source: pg_password_rq_sender
+        target: pg_password_rq_sender
+      - source: pg_password_rq_coordinator
+        target: pg_password_rq_coordinator
+      - source: pg_password_rq_reporter
+        target: pg_password_rq_reporter
+      - source: pg_password_rq_signing_issuer
+        target: pg_password_rq_signing_issuer
+      - source: pg_password_rq_migrator
+        target: pg_password_rq_migrator
+      - source: pg_password_rq_recovery
+        target: pg_password_rq_recovery
+      - source: pg_password_receiver_migrator
+        target: pg_password_receiver_migrator
+      - source: pg_password_receiver_runtime
+        target: pg_password_receiver_runtime
+      - source: pg_password_provider_migrator
+        target: pg_password_provider_migrator
+      - source: pg_password_provider_runtime
+        target: pg_password_provider_runtime
+    networks:
+      app_internal:
+        aliases:
+          - postgres.internal.relayquill.example
+          - postgres-rc.internal.relayquill.example
+          - postgres-pi.internal.relayquill.example
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d relayquill"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  broker-1:
+    build:
+      context: ..
+      dockerfile: infra/images/broker.Dockerfile
+    image: relayquill-broker:local
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - --topology
+      - /etc/relayquill/broker/public-topology.json
+      - --node-id
+      - broker-1
+    volumes:
+      - broker_1_jetstream:/data/jetstream
+      - ./broker/public-topology.json:/etc/relayquill/broker/public-topology.json:ro
+      - ./secrets/broker-keys:/etc/relayquill/broker-keys:ro
+      - ./secrets/certs/broker-ca.pem:/etc/relayquill/certs/broker-ca.pem:ro
+      - ./secrets/certs/broker-cluster-ca.pem:/etc/relayquill/certs/broker-cluster-ca.pem:ro
+      - ./secrets/certs/broker-1-server.crt:/etc/relayquill/certs/broker-server.crt:ro
+      - ./secrets/certs/broker-1-route.crt:/etc/relayquill/certs/broker-route.crt:ro
+    secrets:
+      - source: broker_1_server_key
+        target: broker_server.key
+      - source: broker_1_route_key
+        target: broker_route.key
+    networks:
+      app_internal:
+        aliases:
+          - broker-1.internal.relayquill.example
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/relayquill-broker", "healthcheck", "--url", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  broker-2:
+    build:
+      context: ..
+      dockerfile: infra/images/broker.Dockerfile
+    image: relayquill-broker:local
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - --topology
+      - /etc/relayquill/broker/public-topology.json
+      - --node-id
+      - broker-2
+    volumes:
+      - broker_2_jetstream:/data/jetstream
+      - ./broker/public-topology.json:/etc/relayquill/broker/public-topology.json:ro
+      - ./secrets/broker-keys:/etc/relayquill/broker-keys:ro
+      - ./secrets/certs/broker-ca.pem:/etc/relayquill/certs/broker-ca.pem:ro
+      - ./secrets/certs/broker-cluster-ca.pem:/etc/relayquill/certs/broker-cluster-ca.pem:ro
+      - ./secrets/certs/broker-2-server.crt:/etc/relayquill/certs/broker-server.crt:ro
+      - ./secrets/certs/broker-2-route.crt:/etc/relayquill/certs/broker-route.crt:ro
+    secrets:
+      - source: broker_2_server_key
+        target: broker_server.key
+      - source: broker_2_route_key
+        target: broker_route.key
+    networks:
+      app_internal:
+        aliases:
+          - broker-2.internal.relayquill.example
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/relayquill-broker", "healthcheck", "--url", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  broker-3:
+    build:
+      context: ..
+      dockerfile: infra/images/broker.Dockerfile
+    image: relayquill-broker:local
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - --topology
+      - /etc/relayquill/broker/public-topology.json
+      - --node-id
+      - broker-3
+    volumes:
+      - broker_3_jetstream:/data/jetstream
+      - ./broker/public-topology.json:/etc/relayquill/broker/public-topology.json:ro
+      - ./secrets/broker-keys:/etc/relayquill/broker-keys:ro
+      - ./secrets/certs/broker-ca.pem:/etc/relayquill/certs/broker-ca.pem:ro
+      - ./secrets/certs/broker-cluster-ca.pem:/etc/relayquill/certs/broker-cluster-ca.pem:ro
+      - ./secrets/certs/broker-3-server.crt:/etc/relayquill/certs/broker-server.crt:ro
+      - ./secrets/certs/broker-3-route.crt:/etc/relayquill/certs/broker-route.crt:ro
+    secrets:
+      - source: broker_3_server_key
+        target: broker_server.key
+      - source: broker_3_route_key
+        target: broker_route.key
+    networks:
+      app_internal:
+        aliases:
+          - broker-3.internal.relayquill.example
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/relayquill-broker", "healthcheck", "--url", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  migrate-db:
+    build:
+      context: ..
+      dockerfile: infra/images/application.Dockerfile
+    image: relayquill-app:local
+    profiles: ["ops"]
+    restart: "no"
+    read_only: true
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    environment:
+      RELAYQUILL_ENV: prod
+    command: ["admin", "--config", "/etc/relayquill/config/admin.json", "db", "migrate"]
+    volumes:
+      - ../config/selfhosted.admin.json:/etc/relayquill/config/admin.json:ro
+      - ./secrets/certs/postgres-ca.pem:/etc/relayquill/certs/postgres-ca.pem:ro
+      - ./secrets/certs/broker-ca.pem:/etc/relayquill/certs/broker-ca.pem:ro
+    secrets:
+      - source: pg_password_rq_migrator
+        target: pg_password_rq_migrator
+      - source: nats_rq_admin_nkey
+        target: nats_rq_admin_nkey.seed
+    networks:
+      - app_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ensure-broker:
+    build:
+      context: ..
+      dockerfile: infra/images/application.Dockerfile
+    image: relayquill-app:local
+    profiles: ["ops"]
+    restart: "no"
+    read_only: true
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    environment:
+      RELAYQUILL_ENV: prod
+    command: ["admin", "--config", "/etc/relayquill/config/admin.json", "broker", "ensure"]
+    volumes:
+      - ../config/selfhosted.admin.json:/etc/relayquill/config/admin.json:ro
+      - ./secrets/certs/postgres-ca.pem:/etc/relayquill/certs/postgres-ca.pem:ro
+      - ./secrets/certs/broker-ca.pem:/etc/relayquill/certs/broker-ca.pem:ro
+    secrets:
+      - source: pg_password_rq_migrator
+        target: pg_password_rq_migrator
+      - source: nats_rq_admin_nkey
+        target: nats_rq_admin_nkey.seed
+    networks:
+      - app_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker-1:
+        condition: service_healthy
+      broker-2:
+        condition: service_healthy
+      broker-3:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/images/application.Dockerfile
+    image: relayquill-app:local
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    stop_grace_period: 80s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    environment:
+      RELAYQUILL_ENV: prod
+    command: ["api", "--config", "/etc/relayquill/config/api.json"]
+    volumes:
+      - ../config/selfhosted.api.json:/etc/relayquill/config/api.json:ro
+      - ./secrets/certs/postgres-ca.pem:/etc/relayquill/certs/postgres-ca.pem:ro
+    secrets:
+      - source: pg_password_rq_api
+        target: pg_password_rq_api
+      - source: auth_session_hmac
+        target: auth_session_hmac
+    networks:
+      app_internal:
+        aliases:
+          - relayquill-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8005/api/v1/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  relay:
+    build:
+      context: ..
+      dockerfile: infra/images/application.Dockerfile
+    image: relayquill-app:local
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    stop_grace_period: 80s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    environment:
+      RELAYQUILL_ENV: prod
+    command: ["relay", "--config", "/etc/relayquill/config/relay.json"]
+    volumes:
+      - ../config/selfhosted.relay.json:/etc/relayquill/config/relay.json:ro
+      - ./secrets/certs/postgres-ca.pem:/etc/relayquill/certs/postgres-ca.pem:ro
+      - ./secrets/certs/broker-ca.pem:/etc/relayquill/certs/broker-ca.pem:ro
+    secrets:
+      - source: pg_password_rq_relay
+        target: pg_password_rq_relay
+      - source: nats_rq_relay_nkey
+        target: nats_rq_relay_nkey.seed
+    networks:
+      - app_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker-1:
+        condition: service_healthy
+      broker-2:
+        condition: service_healthy
+      broker-3:
+        condition: service_healthy
+
+  fanout:
+    build:
+      context: ..
+      dockerfile: infra/images/application.Dockerfile
+    image: relayquill-app:local
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    stop_grace_period: 80s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    environment:
+      RELAYQUILL_ENV: prod
+    command: ["fanout", "--config", "/etc/relayquill/config/fanout.json"]
+    volumes:
+      - ../config/selfhosted.fanout.json:/etc/relayquill/config/fanout.json:ro
+      - ./secrets/certs/postgres-ca.pem:/etc/relayquill/certs/postgres-ca.pem:ro
+      - ./secrets/certs/broker-ca.pem:/etc/relayquill/certs/broker-ca.pem:ro
+    secrets:
+      - source: pg_password_rq_fanout
+        target: pg_password_rq_fanout
+      - source: nats_rq_fanout_nkey
+        target: nats_rq_fanout_nkey.seed
+    networks:
+      - app_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+      broker-1:
+        condition: service_healthy
+      broker-2:
+        condition: service_healthy
+      broker-3:
+        condition: service_healthy
+
+  sender:
+    build:
+      context: ..
+      dockerfile: infra/images/application.Dockerfile
+    image: relayquill-app:local
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    stop_grace_period: 80s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    environment:
+      RELAYQUILL_ENV: prod
+    command: ["sender", "--config", "/etc/relayquill/config/sender.json"]
+    volumes:
+      - ../config/selfhosted.sender.json:/etc/relayquill/config/sender.json:ro
+      - ./secrets/certs/postgres-ca.pem:/etc/relayquill/certs/postgres-ca.pem:ro
+    secrets:
+      - source: pg_password_rq_sender
+        target: pg_password_rq_sender
+      - source: endpoint_signing_keys
+        target: endpoint_signing_keys
+    networks:
+      - app_internal
+      - egress
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  coordinator:
+    build:
+      context: ..
+      dockerfile: infra/images/application.Dockerfile
+    image: relayquill-app:local
+    restart: unless-stopped
+    read_only: true
+    user: "10001:10001"
+    stop_grace_period: 80s
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    environment:
+      RELAYQUILL_ENV: prod
+    command: ["coordinator", "--config", "/etc/relayquill/config/coordinator.json"]
+    volumes:
+      - ../config/selfhosted.coordinator.json:/etc/relayquill/config/coordinator.json:ro
+      - ./secrets/certs/postgres-ca.pem:/etc/relayquill/certs/postgres-ca.pem:ro
+    secrets:
+      - source: pg_password_rq_coordinator
+        target: pg_password_rq_coordinator
+    networks:
+      - app_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  console:
+    build:
+      context: ..
+      dockerfile: infra/images/console.Dockerfile
+    image: relayquill-console:local
+    restart: unless-stopped
+    read_only: true
+    user: "101:101"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    environment:
+      RELAYQUILL_API_UPSTREAM: http://relayquill-api:8005
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - edge
+      - app_internal
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5

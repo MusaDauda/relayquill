@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Optional AWS EKS overlay. Replace the base ConfigMaps with config/release.*.json
+# and pin ECR image digests before deploying to an EKS cluster.
+resources:
+  - ../../base
+  - ../../receiver
+  - ../../ingress
+  - alb-ingress.yaml
+  - networkpolicies-eks.yaml
+
+patches:
+  - path: patch-serviceaccounts.yaml

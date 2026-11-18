@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: relayquill-provider-ingress
+  namespace: relayquill-ingress
+  labels:
+    app.kubernetes.io/name: relayquill-provider-ingress
+    app.kubernetes.io/part-of: relayquill
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: relayquill-provider-ingress
+  ports:
+    - name: http
+      port: 19096
+      targetPort: http
+      protocol: TCP

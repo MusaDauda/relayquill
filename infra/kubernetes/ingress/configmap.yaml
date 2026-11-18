@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: relayquill-ingress-config
+  namespace: relayquill-ingress
+data:
+  provider-ingress.json: |
+    {
+      "schema_version": 1,
+      "profile": "self_hosted",
+      "process_role": "provider_ingress",
+      "http": {
+        "host": "0.0.0.0",
+        "port": 19096,
+        "trust_proxy": true
+      },
+      "database": {
+        "mode": "standard_tls",
+        "isolation": "separate_databases",
+        "host": "relayquill-postgres.relayquill-data.svc.cluster.local",
+        "port": 5432,
+        "name": "relayquill_provider",
+        "schema": "pi",
+        "support_schema": "rq_support",
+        "role": "provider_runtime",
+        "authentication": "secret_provider_password",
+        "password_secret_ref": "file:/run/secrets/pg_password_provider_runtime",
+        "tls_mode": "verify_full",
+        "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+        "pool_mode": "direct",
+        "maximum_connections": 8,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 5000,
+        "lock_timeout_ms": 2000
+      },
+      "secret_provider": {
+        "mode": "mounted_file",
+        "secrets_dir": "/run/secrets"
+      },
+      "relayquill_api": {
+        "origin": "http://relayquill-api.relayquill-app.svc.cluster.local:8005",
+        "project_id": "00000000-0000-4000-8000-000000000001",
+        "credential_secret_ref": "file:/run/secrets/provider_ingress_producer_credential"
+      },
+      "telemetry": {
+        "enabled": true,
+        "service_name": "relayquill-provider-ingress",
+        "max_queue_size": 2048,
+        "max_export_batch_size": 256
+      },
+      "protocol": {
+        "http_schema_version": 1,
+        "broker_envelope_version": 1,
+        "webhook_signature_version": 1
+      }
+    }
+  provider-ingress-migrator.json: |
+    {
+      "schema_version": 1,
+      "profile": "self_hosted",
+      "process_role": "provider_ingress_migrator",
+      "database": {
+        "mode": "standard_tls",
+        "isolation": "separate_databases",
+        "host": "relayquill-postgres.relayquill-data.svc.cluster.local",
+        "port": 5432,
+        "name": "relayquill_provider",
+        "schema": "pi",
+        "support_schema": "rq_support",
+        "role": "provider_migrator",
+        "authentication": "secret_provider_password",
+        "password_secret_ref": "file:/run/secrets/pg_password_provider_migrator",
+        "tls_mode": "verify_full",
+        "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+        "pool_mode": "direct",
+        "maximum_connections": 2,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 30000,
+        "lock_timeout_ms": 5000
+      },
+      "migrations_dir": "examples/provider-ingress/migrations"
+    }

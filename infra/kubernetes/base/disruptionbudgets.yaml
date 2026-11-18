@@ -1,0 +1,65 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: relayquill-api
+  namespace: relayquill-app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: relayquill-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: relayquill-relay
+  namespace: relayquill-app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: relayquill-relay
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: relayquill-fanout
+  namespace: relayquill-app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: relayquill-fanout
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: relayquill-sender
+  namespace: relayquill-app
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: relayquill-sender
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: relayquill-coordinator
+  namespace: relayquill-app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: relayquill-coordinator
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: relayquill-console
+  namespace: relayquill-app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: relayquill-console

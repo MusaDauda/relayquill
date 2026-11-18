@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relayquill-provider-ingress
+  namespace: relayquill-ingress
+  labels:
+    app.kubernetes.io/name: relayquill-provider-ingress
+    app.kubernetes.io/component: provider-ingress
+    app.kubernetes.io/part-of: relayquill
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: relayquill-provider-ingress
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: relayquill-provider-ingress
+        app.kubernetes.io/component: provider-ingress
+        app.kubernetes.io/part-of: relayquill
+    spec:
+      serviceAccountName: relayquill-provider-ingress
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: relayquill-provider-ingress
+      containers:
+        - name: provider-ingress
+          image: relayquill/application:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - provider-ingress
+            - --config
+            - /etc/relayquill/config/provider-ingress.json
+            - serve
+          ports:
+            - name: http
+              containerPort: 19096
+              protocol: TCP
+          env:
+            - name: RELAYQUILL_ENV
+              value: prod
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/relayquill/config
+              readOnly: true
+            - name: certs
+              mountPath: /etc/relayquill/certs
+              readOnly: true
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: relayquill-ingress-config
+            items:
+              - key: provider-ingress.json
+                path: provider-ingress.json
+        - name: certs
+          configMap:
+            name: relayquill-ingress-ca-bundles
+        - name: secrets
+          secret:
+            secretName: relayquill-ingress-secrets
+            defaultMode: 0440
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: relayquill-provider-ingress
+  namespace: relayquill-ingress
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: relayquill-provider-ingress

@@ -1,0 +1,74 @@
+# Non-auto-running reviewed recovery Job template.
+# Uses the dedicated rq_recovery identity (relayquill-recovery ServiceAccount).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: relayquill-recovery-inspect
+  namespace: relayquill-app
+  labels:
+    app.kubernetes.io/name: relayquill-recovery
+    app.kubernetes.io/component: recovery
+    app.kubernetes.io/part-of: relayquill
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: relayquill-recovery
+        app.kubernetes.io/component: recovery
+    spec:
+      serviceAccountName: relayquill-recovery
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: recovery-inspect
+          image: relayquill/application:latest
+          args:
+            - admin
+            - --config
+            - /etc/relayquill/config/recovery.json
+            - recovery
+            - inspect
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: config
+              mountPath: /etc/relayquill/config
+              readOnly: true
+            - name: certs
+              mountPath: /etc/relayquill/certs
+              readOnly: true
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: relayquill-role-configs
+            items:
+              - key: recovery.json
+                path: recovery.json
+        - name: certs
+          configMap:
+            name: relayquill-ca-bundles
+        - name: secrets
+          secret:
+            secretName: relayquill-recovery-secrets
+            defaultMode: 0440
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi

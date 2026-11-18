@@ -1,0 +1,84 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: relayquill-public
+  namespace: relayquill-app
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - console.relayquill.example
+      secretName: relayquill-public-tls
+  rules:
+    - host: console.relayquill.example
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: relayquill-api
+                port:
+                  number: 8005
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: relayquill-console
+                port:
+                  number: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: relayquill-receiver
+  namespace: relayquill-receiver
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - receiver.relayquill.example
+      secretName: relayquill-receiver-tls
+  rules:
+    - host: receiver.relayquill.example
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: relayquill-receiver
+                port:
+                  number: 19095
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: relayquill-provider-ingress
+  namespace: relayquill-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ingress.relayquill.example
+      secretName: relayquill-ingress-tls
+  rules:
+    - host: ingress.relayquill.example
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: relayquill-provider-ingress
+                port:
+                  number: 19096

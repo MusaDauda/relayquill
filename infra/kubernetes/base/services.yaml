@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: relayquill-api
+  namespace: relayquill-app
+  labels:
+    app.kubernetes.io/name: relayquill-api
+    app.kubernetes.io/part-of: relayquill
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: relayquill-api
+  ports:
+    - name: http
+      port: 8005
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: relayquill-console
+  namespace: relayquill-app
+  labels:
+    app.kubernetes.io/name: relayquill-console
+    app.kubernetes.io/part-of: relayquill
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: relayquill-console
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: relayquill-relay-health
+  namespace: relayquill-app
+  labels:
+    app.kubernetes.io/name: relayquill-relay
+    app.kubernetes.io/part-of: relayquill
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: relayquill-relay
+  ports:
+    - name: health
+      port: 8081
+      targetPort: health
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: relayquill-fanout-health
+  namespace: relayquill-app
+  labels:
+    app.kubernetes.io/name: relayquill-fanout
+    app.kubernetes.io/part-of: relayquill
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: relayquill-fanout
+  ports:
+    - name: health
+      port: 8081
+      targetPort: health
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: relayquill-sender-health
+  namespace: relayquill-app
+  labels:
+    app.kubernetes.io/name: relayquill-sender
+    app.kubernetes.io/part-of: relayquill
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: relayquill-sender
+  ports:
+    - name: health
+      port: 8081
+      targetPort: health
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: relayquill-coordinator-health
+  namespace: relayquill-app
+  labels:
+    app.kubernetes.io/name: relayquill-coordinator
+    app.kubernetes.io/part-of: relayquill
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: relayquill-coordinator
+  ports:
+    - name: health
+      port: 8081
+      targetPort: health
+      protocol: TCP

@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: relayquill-console
+  namespace: relayquill-app
+  labels:
+    app.kubernetes.io/name: relayquill-console
+    app.kubernetes.io/component: console
+    app.kubernetes.io/part-of: relayquill
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: relayquill-console
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: relayquill-console
+        app.kubernetes.io/component: console
+        app.kubernetes.io/part-of: relayquill
+    spec:
+      serviceAccountName: relayquill-console
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: console
+          image: relayquill/console:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: RELAYQUILL_API_UPSTREAM
+              value: http://relayquill-api.relayquill-app.svc.cluster.local:8005
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 2
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi

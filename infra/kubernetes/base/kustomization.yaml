@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespaces.yaml
+  - serviceaccounts.yaml
+  - configmaps.yaml
+  - api.yaml
+  - relay.yaml
+  - fanout.yaml
+  - sender.yaml
+  - coordinator.yaml
+  - console.yaml
+  - services.yaml
+  - networkpolicies.yaml
+  - disruptionbudgets.yaml
+
+patches:
+  - path: topologyspread.yaml

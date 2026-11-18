@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "server_name": "relayquill-broker",
+  "host": "0.0.0.0",
+  "client_port": 4222,
+  "max_payload": 8192,
+  "max_connections": 1024,
+  "monitoring": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 8222
+  },
+  "tls": {
+    "enabled": true,
+    "handshake_first": true,
+    "min_version": "1.2",
+    "verify_client_cert": false,
+    "cert_ref": "file:/etc/relayquill/certs/broker-server.crt",
+    "key_ref": "file:/run/secrets/broker_server.key",
+    "ca_ref": "file:/etc/relayquill/certs/broker-ca.pem"
+  },
+  "cluster": {
+    "enabled": true,
+    "name": "relayquill-jetstream",
+    "host": "0.0.0.0",
+    "port": 6222,
+    "routes": [
+      "nats://broker-1.internal.relayquill.example:6222",
+      "nats://broker-2.internal.relayquill.example:6222",
+      "nats://broker-3.internal.relayquill.example:6222"
+    ],
+    "allowed_route_peers": [
+      "broker-1.internal.relayquill.example",
+      "broker-2.internal.relayquill.example",
+      "broker-3.internal.relayquill.example"
+    ],
+    "tls": {
+      "min_version": "1.2",
+      "ca_ref": "file:/etc/relayquill/certs/broker-cluster-ca.pem",
+      "cert_ref": "file:/etc/relayquill/certs/broker-route.crt",
+      "key_ref": "file:/run/secrets/broker_route.key"
+    }
+  },
+  "nodes": [
+    {
+      "id": "broker-1",
+      "server_name": "broker-1",
+      "host": "0.0.0.0",
+      "client_port": 4222,
+      "client_advertise": "broker-1.internal.relayquill.example:4222",
+      "cluster_host": "0.0.0.0",
+      "cluster_port": 6222,
+      "cluster_advertise": "broker-1.internal.relayquill.example:6222",
+      "monitor_host": "0.0.0.0",
+      "monitor_port": 8222,
+      "store_dir": "/data/jetstream",
+      "tls_cert_ref": "file:/etc/relayquill/certs/broker-server.crt",
+      "tls_key_ref": "file:/run/secrets/broker_server.key",
+      "tls_ca_ref": "file:/etc/relayquill/certs/broker-ca.pem",
+      "cluster_ca_ref": "file:/etc/relayquill/certs/broker-cluster-ca.pem",
+      "cluster_cert_ref": "file:/etc/relayquill/certs/broker-route.crt",
+      "cluster_key_ref": "file:/run/secrets/broker_route.key"
+    },
+    {
+      "id": "broker-2",
+      "server_name": "broker-2",
+      "host": "0.0.0.0",
+      "client_port": 4222,
+      "client_advertise": "broker-2.internal.relayquill.example:4222",
+      "cluster_host": "0.0.0.0",
+      "cluster_port": 6222,
+      "cluster_advertise": "broker-2.internal.relayquill.example:6222",
+      "monitor_host": "0.0.0.0",
+      "monitor_port": 8222,
+      "store_dir": "/data/jetstream",
+      "tls_cert_ref": "file:/etc/relayquill/certs/broker-server.crt",
+      "tls_key_ref": "file:/run/secrets/broker_server.key",
+      "tls_ca_ref": "file:/etc/relayquill/certs/broker-ca.pem",
+      "cluster_ca_ref": "file:/etc/relayquill/certs/broker-cluster-ca.pem",
+      "cluster_cert_ref": "file:/etc/relayquill/certs/broker-route.crt",
+      "cluster_key_ref": "file:/run/secrets/broker_route.key"
+    },
+    {
+      "id": "broker-3",
+      "server_name": "broker-3",
+      "host": "0.0.0.0",
+      "client_port": 4222,
+      "client_advertise": "broker-3.internal.relayquill.example:4222",
+      "cluster_host": "0.0.0.0",
+      "cluster_port": 6222,
+      "cluster_advertise": "broker-3.internal.relayquill.example:6222",
+      "monitor_host": "0.0.0.0",
+      "monitor_port": 8222,
+      "store_dir": "/data/jetstream",
+      "tls_cert_ref": "file:/etc/relayquill/certs/broker-server.crt",
+      "tls_key_ref": "file:/run/secrets/broker_server.key",
+      "tls_ca_ref": "file:/etc/relayquill/certs/broker-ca.pem",
+      "cluster_ca_ref": "file:/etc/relayquill/certs/broker-cluster-ca.pem",
+      "cluster_cert_ref": "file:/etc/relayquill/certs/broker-route.crt",
+      "cluster_key_ref": "file:/run/secrets/broker_route.key"
+    }
+  ],
+  "jetstream": {
+    "enabled": true,
+    "store_dir": "/data/jetstream",
+    "max_memory_store": 268435456,
+    "max_file_store": 21474836480,
+    "sync_interval": "always",
+    "stream_name": "RELAYQUILL_EVENTS_V1",
+    "consumer_name": "RELAYQUILL_FANOUT_V1",
+    "subject_prefix": ""
+  },
+  "principals": {
+    "relay": {
+      "public_nkey_ref": "file:/etc/relayquill/broker-keys/relay.pub",
+      "inbox_prefix": "_INBOX.rq.relay",
+      "publish_allow": [
+        "rq.events.*.accepted"
+      ],
+      "subscribe_allow": [
+        "_INBOX.rq.relay.>"
+      ]
+    },
+    "fanout": {
+      "public_nkey_ref": "file:/etc/relayquill/broker-keys/fanout.pub",
+      "inbox_prefix": "_INBOX.rq.fanout",
+      "publish_allow": [
+        "$JS.API.STREAM.INFO.RELAYQUILL_EVENTS_V1",
+        "$JS.API.CONSUMER.INFO.RELAYQUILL_EVENTS_V1.RELAYQUILL_FANOUT_V1",
+        "$JS.API.CONSUMER.MSG.NEXT.RELAYQUILL_EVENTS_V1.RELAYQUILL_FANOUT_V1",
+        "$JS.ACK.RELAYQUILL_EVENTS_V1.RELAYQUILL_FANOUT_V1.>",
+        "$JS.ACK.*.*.RELAYQUILL_EVENTS_V1.RELAYQUILL_FANOUT_V1.>"
+      ],
+      "subscribe_allow": [
+        "_INBOX.rq.fanout.>"
+      ]
+    },
+    "broker_admin": {
+      "public_nkey_ref": "file:/etc/relayquill/broker-keys/admin.pub",
+      "inbox_prefix": "_INBOX.rq.admin",
+      "publish_allow": [
+        "$JS.API.INFO",
+        "$JS.API.STREAM.INFO.RELAYQUILL_EVENTS_V1",
+        "$JS.API.STREAM.CREATE.RELAYQUILL_EVENTS_V1",
+        "$JS.API.STREAM.UPDATE.RELAYQUILL_EVENTS_V1",
+        "$JS.API.CONSUMER.INFO.RELAYQUILL_EVENTS_V1.RELAYQUILL_FANOUT_V1",
+        "$JS.API.CONSUMER.CREATE.RELAYQUILL_EVENTS_V1.RELAYQUILL_FANOUT_V1",
+        "$JS.API.CONSUMER.CREATE.RELAYQUILL_EVENTS_V1.RELAYQUILL_FANOUT_V1.>"
+      ],
+      "subscribe_allow": [
+        "_INBOX.rq.admin.>"
+      ]
+    }
+  }
+}

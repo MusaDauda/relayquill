@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: relayquill-app
+  labels:
+    app.kubernetes.io/part-of: relayquill
+    relayquill.example/namespace: relayquill-app
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: relayquill-receiver
+  labels:
+    app.kubernetes.io/part-of: relayquill
+    relayquill.example/namespace: relayquill-receiver
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: relayquill-ingress
+  labels:
+    app.kubernetes.io/part-of: relayquill
+    relayquill.example/namespace: relayquill-ingress
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

@@ -1,0 +1,389 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: relayquill-role-configs
+  namespace: relayquill-app
+data:
+  api.json: |
+    {
+      "schema_version": 1,
+      "profile": "self_hosted",
+      "process_role": "api",
+      "http": {
+        "host": "0.0.0.0",
+        "port": 8005,
+        "public_origin": "https://console.relayquill.example",
+        "trust_proxy": true,
+        "sse_heartbeat_ms": 10000,
+        "sse_max_lifetime_ms": 60000
+      },
+      "database": {
+        "mode": "standard_tls",
+        "isolation": "separate_databases",
+        "host": "relayquill-postgres.relayquill-data.svc.cluster.local",
+        "port": 5432,
+        "name": "relayquill",
+        "schema": "rq",
+        "support_schema": "rq_support",
+        "role": "rq_api",
+        "authentication": "secret_provider_password",
+        "password_secret_ref": "file:/run/secrets/pg_password_rq_api",
+        "tls_mode": "verify_full",
+        "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+        "pool_mode": "direct",
+        "maximum_connections": 16,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 5000,
+        "lock_timeout_ms": 2000
+      },
+      "auth": {
+        "rp_id": "console.relayquill.example",
+        "allowed_origins": ["https://console.relayquill.example"],
+        "cookie_profile": "release_https"
+      },
+      "secret_provider": {
+        "mode": "mounted_file",
+        "secrets_dir": "/run/secrets"
+      },
+      "operator_channel": {
+        "env_name": "prod",
+        "channel": "api-admin"
+      },
+      "telemetry": {
+        "enabled": true,
+        "service_name": "relayquill-api",
+        "max_queue_size": 2048,
+        "max_export_batch_size": 256
+      },
+      "protocol": {
+        "http_schema_version": 1,
+        "broker_envelope_version": 1,
+        "webhook_signature_version": 1
+      }
+    }
+  relay.json: |
+    {
+      "schema_version": 1,
+      "profile": "self_hosted",
+      "process_role": "relay",
+      "database": {
+        "mode": "standard_tls",
+        "isolation": "separate_databases",
+        "host": "relayquill-postgres.relayquill-data.svc.cluster.local",
+        "port": 5432,
+        "name": "relayquill",
+        "schema": "rq",
+        "support_schema": "rq_support",
+        "role": "rq_relay",
+        "authentication": "secret_provider_password",
+        "password_secret_ref": "file:/run/secrets/pg_password_rq_relay",
+        "tls_mode": "verify_full",
+        "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+        "pool_mode": "direct",
+        "maximum_connections": 8,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 5000,
+        "lock_timeout_ms": 2000
+      },
+      "broker": {
+        "mode": "standard_tls",
+        "servers": [
+          "tls://relayquill-broker-0.relayquill-broker-headless.relayquill-data.svc.cluster.local:4222",
+          "tls://relayquill-broker-1.relayquill-broker-headless.relayquill-data.svc.cluster.local:4222",
+          "tls://relayquill-broker-2.relayquill-broker-headless.relayquill-data.svc.cluster.local:4222"
+        ],
+        "auth_mode": "nkey_seed",
+        "secret_ref": "file:/run/secrets/nats_rq_relay_nkey.seed",
+        "tls": {
+          "enabled": true,
+          "handshake_first": true,
+          "ca_file": "/etc/relayquill/certs/broker-ca.pem",
+          "reject_unauthorized": true
+        },
+        "stream_name": "RELAYQUILL_EVENTS_V1",
+        "subject_prefix": "",
+        "consumer_name": "RELAYQUILL_FANOUT_V1",
+        "replicas": 3,
+        "max_msgs": 10000000,
+        "max_bytes": 21474836480,
+        "max_msg_size": 4096,
+        "max_age_ns": 86400000000000,
+        "duplicate_window_ns": 120000000000,
+        "inbox_prefix": "_INBOX.rq.relay"
+      },
+      "relay": {
+        "poll_interval_ms": 200,
+        "batch_size": 32,
+        "claim_lease_ms": 30000,
+        "publish_concurrency": 16,
+        "publish_timeout_ms": 5000
+      },
+      "telemetry": {
+        "enabled": true,
+        "service_name": "relayquill-relay",
+        "max_queue_size": 2048,
+        "max_export_batch_size": 256
+      },
+      "protocol": {
+        "http_schema_version": 1,
+        "broker_envelope_version": 1,
+        "webhook_signature_version": 1
+      }
+    }
+  fanout.json: |
+    {
+      "schema_version": 1,
+      "profile": "self_hosted",
+      "process_role": "fanout",
+      "database": {
+        "mode": "standard_tls",
+        "isolation": "separate_databases",
+        "host": "relayquill-postgres.relayquill-data.svc.cluster.local",
+        "port": 5432,
+        "name": "relayquill",
+        "schema": "rq",
+        "support_schema": "rq_support",
+        "role": "rq_fanout",
+        "authentication": "secret_provider_password",
+        "password_secret_ref": "file:/run/secrets/pg_password_rq_fanout",
+        "tls_mode": "verify_full",
+        "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+        "pool_mode": "direct",
+        "maximum_connections": 8,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 5000,
+        "lock_timeout_ms": 2000
+      },
+      "broker": {
+        "mode": "standard_tls",
+        "servers": [
+          "tls://relayquill-broker-0.relayquill-broker-headless.relayquill-data.svc.cluster.local:4222",
+          "tls://relayquill-broker-1.relayquill-broker-headless.relayquill-data.svc.cluster.local:4222",
+          "tls://relayquill-broker-2.relayquill-broker-headless.relayquill-data.svc.cluster.local:4222"
+        ],
+        "auth_mode": "nkey_seed",
+        "secret_ref": "file:/run/secrets/nats_rq_fanout_nkey.seed",
+        "tls": {
+          "enabled": true,
+          "handshake_first": true,
+          "ca_file": "/etc/relayquill/certs/broker-ca.pem",
+          "reject_unauthorized": true
+        },
+        "stream_name": "RELAYQUILL_EVENTS_V1",
+        "subject_prefix": "",
+        "consumer_name": "RELAYQUILL_FANOUT_V1",
+        "replicas": 3,
+        "max_msgs": 10000000,
+        "max_bytes": 21474836480,
+        "max_msg_size": 4096,
+        "max_age_ns": 86400000000000,
+        "duplicate_window_ns": 120000000000,
+        "inbox_prefix": "_INBOX.rq.fanout"
+      },
+      "fanout": {
+        "ack_wait_ms": 30000,
+        "max_deliver": 10,
+        "max_ack_pending": 128,
+        "max_batch": 32,
+        "max_bytes": 262144,
+        "max_expires_ms": 5000
+      },
+      "telemetry": {
+        "enabled": true,
+        "service_name": "relayquill-fanout",
+        "max_queue_size": 2048,
+        "max_export_batch_size": 256
+      },
+      "protocol": {
+        "http_schema_version": 1,
+        "broker_envelope_version": 1,
+        "webhook_signature_version": 1
+      }
+    }
+  sender.json: |
+    {
+      "schema_version": 1,
+      "profile": "self_hosted",
+      "process_role": "sender",
+      "database": {
+        "mode": "standard_tls",
+        "isolation": "separate_databases",
+        "host": "relayquill-postgres.relayquill-data.svc.cluster.local",
+        "port": 5432,
+        "name": "relayquill",
+        "schema": "rq",
+        "support_schema": "rq_support",
+        "role": "rq_sender",
+        "authentication": "secret_provider_password",
+        "password_secret_ref": "file:/run/secrets/pg_password_rq_sender",
+        "tls_mode": "verify_full",
+        "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+        "pool_mode": "direct",
+        "maximum_connections": 8,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 5000,
+        "lock_timeout_ms": 2000
+      },
+      "secret_provider": {
+        "mode": "mounted_file",
+        "secrets_dir": "/run/secrets"
+      },
+      "sender": {
+        "dispatch_domain": "primary",
+        "approved_slots": 8,
+        "poll_interval_ms": 200,
+        "request_timeout_ms": 5000,
+        "max_response_bytes": 65536
+      },
+      "egress": {
+        "mode": "strict_public_https",
+        "allow_fixture_receiver": false
+      },
+      "telemetry": {
+        "enabled": true,
+        "service_name": "relayquill-sender",
+        "max_queue_size": 2048,
+        "max_export_batch_size": 256
+      },
+      "protocol": {
+        "http_schema_version": 1,
+        "broker_envelope_version": 1,
+        "webhook_signature_version": 1
+      }
+    }
+  coordinator.json: |
+    {
+      "schema_version": 1,
+      "profile": "self_hosted",
+      "process_role": "coordinator",
+      "database": {
+        "mode": "standard_tls",
+        "isolation": "separate_databases",
+        "host": "relayquill-postgres.relayquill-data.svc.cluster.local",
+        "port": 5432,
+        "name": "relayquill",
+        "schema": "rq",
+        "support_schema": "rq_support",
+        "role": "rq_coordinator",
+        "authentication": "secret_provider_password",
+        "password_secret_ref": "file:/run/secrets/pg_password_rq_coordinator",
+        "tls_mode": "verify_full",
+        "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+        "pool_mode": "direct",
+        "maximum_connections": 4,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 5000,
+        "lock_timeout_ms": 2000
+      },
+      "coordinator": {
+        "loop_interval_ms": 1000,
+        "reaper_batch_size": 100,
+        "retention_batch_size": 100,
+        "projection_batch_size": 100
+      },
+      "telemetry": {
+        "enabled": true,
+        "service_name": "relayquill-coordinator",
+        "max_queue_size": 2048,
+        "max_export_batch_size": 256
+      },
+      "protocol": {
+        "http_schema_version": 1,
+        "broker_envelope_version": 1,
+        "webhook_signature_version": 1
+      }
+    }
+  admin.json: |
+    {
+      "schema_version": 1,
+      "profile": "self_hosted",
+      "process_role": "admin",
+      "command_role": "db_and_broker_admin",
+      "database": {
+        "mode": "standard_tls",
+        "isolation": "separate_databases",
+        "host": "relayquill-postgres.relayquill-data.svc.cluster.local",
+        "port": 5432,
+        "name": "relayquill",
+        "schema": "rq",
+        "support_schema": "rq_support",
+        "role": "rq_migrator",
+        "authentication": "secret_provider_password",
+        "password_secret_ref": "file:/run/secrets/pg_password_rq_migrator",
+        "tls_mode": "verify_full",
+        "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+        "pool_mode": "direct",
+        "maximum_connections": 2,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 30000,
+        "lock_timeout_ms": 5000
+      },
+      "broker": {
+        "mode": "standard_tls",
+        "servers": [
+          "tls://relayquill-broker-0.relayquill-broker-headless.relayquill-data.svc.cluster.local:4222",
+          "tls://relayquill-broker-1.relayquill-broker-headless.relayquill-data.svc.cluster.local:4222",
+          "tls://relayquill-broker-2.relayquill-broker-headless.relayquill-data.svc.cluster.local:4222"
+        ],
+        "auth_mode": "nkey_seed",
+        "secret_ref": "file:/run/secrets/nats_rq_admin_nkey.seed",
+        "tls": {
+          "enabled": true,
+          "handshake_first": true,
+          "ca_file": "/etc/relayquill/certs/broker-ca.pem",
+          "reject_unauthorized": true
+        },
+        "stream_name": "RELAYQUILL_EVENTS_V1",
+        "subject_prefix": "",
+        "consumer_name": "RELAYQUILL_FANOUT_V1",
+        "replicas": 3,
+        "max_msgs": 10000000,
+        "max_bytes": 21474836480,
+        "max_msg_size": 4096,
+        "max_age_ns": 86400000000000,
+        "duplicate_window_ns": 120000000000,
+        "inbox_prefix": "_INBOX.rq.admin"
+      },
+      "migrations_dir": "migrations",
+      "protocol": {
+        "http_schema_version": 1,
+        "broker_envelope_version": 1,
+        "webhook_signature_version": 1
+      }
+    }
+  recovery.json: |
+    {
+      "schema_version": 1,
+      "profile": "self_hosted",
+      "process_role": "admin",
+      "command_role": "recovery_operator",
+      "database": {
+        "mode": "standard_tls",
+        "isolation": "separate_databases",
+        "host": "relayquill-postgres.relayquill-data.svc.cluster.local",
+        "port": 5432,
+        "name": "relayquill",
+        "schema": "rq",
+        "support_schema": "rq_support",
+        "role": "rq_recovery",
+        "authentication": "secret_provider_password",
+        "password_secret_ref": "file:/run/secrets/pg_password_rq_recovery",
+        "tls_mode": "verify_full",
+        "tls_ca_file": "/etc/relayquill/certs/postgres-ca.pem",
+        "pool_mode": "direct",
+        "maximum_connections": 2,
+        "connection_timeout_ms": 5000,
+        "statement_timeout_ms": 30000,
+        "lock_timeout_ms": 5000
+      },
+      "operator_channel": {
+        "env_name": "prod",
+        "channel": "api-admin"
+      },
+      "recovery": {
+        "actor_role": "operator",
+        "plan_dir": "recovery-plans",
+        "require_two_person_review": true,
+        "target_schema_revision": "0009"
+      }
+    }

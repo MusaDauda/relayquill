@@ -1,0 +1,62 @@
+:root {
+  /* Fonts */
+  --font-sans: "Geist Sans", "SF Pro Display", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", "SF Mono", ui-monospace, Menlo, Monaco, Consolas, monospace;
+
+  /* Surfaces & Canvas (Warm Monochrome) */
+  --bg-canvas: #f7f6f3;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1efe9;
+  --bg-rail: #fbfbfa;
+  --bg-code: #f5f4f0;
+  --bg-backdrop: rgba(24, 24, 27, 0.56);
+
+  /* Text (>= 4.5:1 contrast against all surfaces) */
+  --fg-primary: #1c1b1a;
+  --fg-secondary: #4e4c47;
+  --fg-inverse: #ffffff;
+
+  /* Borders (Structural vs >=3:1 Interactive Controls) */
+  --border-structural: #e4e2dd;
+  --border-control: #706d67;
+  --border-strong: #1c1b1a;
+
+  /* Primary Interactive */
+  --action-primary-bg: #18181b;
+  --action-primary-bg-hover: #2e2e33;
+  --action-primary-fg: #ffffff;
+
+  /* Muted Semantic Pastels (WCAG AA >= 4.5:1 text & >= 3:1 border) */
+  --tone-ok-bg: #ebf4eb;
+  --tone-ok-fg: #1f5224;
+  --tone-ok-border: #3d7543;
+
+  --tone-info-bg: #e5f2fa;
+  --tone-info-fg: #154d75;
+  --tone-info-border: #38729c;
+
+  --tone-warn-bg: #fbf2d6;
+  --tone-warn-fg: #6b4400;
+  --tone-warn-border: #8c6214;
+
+  --tone-error-bg: #fce8e9;
+  --tone-error-fg: #8c1e1c;
+  --tone-error-border: #ad3f3c;
+
+  --tone-neutral-bg: #f0efe9;
+  --tone-neutral-fg: #3b3935;
+  --tone-neutral-border: #6e6b65;
+
+  /* 8px Spacing Scale */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-6: 48px;
+
+  /* Radii & Focus */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --focus-ring-color: #18181b;
+}

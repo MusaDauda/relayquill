@@ -1,14 +1,14 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { CONSOLE_APP_VERSION } from "./index.js";
+import "./styles/tokens.css";
+import "./styles/console.css";
+import { App } from "./app/App.js";
 
-const rootElement = document.getElementById("root");
-if (rootElement) {
-  createRoot(rootElement).render(
+const rootEl = document.getElementById("root");
+if (rootEl !== null) {
+  createRoot(rootEl).render(
     <StrictMode>
-      <main data-version={CONSOLE_APP_VERSION}>
-        <h1>Relayquill Console</h1>
-      </main>
+      <App />
     </StrictMode>
   );
 }

@@ -1,0 +1,1715 @@
+{
+  "manifest_version": 1,
+  "owner_role": "rq_owner",
+  "migrator_role": "rq_migrator",
+  "recovery_role": "rq_recovery",
+  "schemas": [
+    "rq",
+    "rq_support",
+    "rq_recovery"
+  ],
+  "login_roles": [
+    "rq_api",
+    "rq_relay",
+    "rq_fanout",
+    "rq_sender",
+    "rq_coordinator",
+    "rq_reporter",
+    "rq_signing_issuer",
+    "rq_migrator",
+    "rq_recovery"
+  ],
+  "compatibility": {
+    "postgresql_18": {
+      "enforcement": "strict_session_user_and_acl",
+      "extension_schema": "rq_support",
+      "notes": "Objects owned by NOLOGIN rq_owner; PUBLIC revoked on schema, tables, sequences, and functions; cmd_* and read_* use SECURITY DEFINER SET search_path = pg_catalog and enforce session_user."
+    },
+    "pglite_0_5_16": {
+      "enforcement": "guarded_bootstrap_and_acl_preserved",
+      "extension_schema": "auto_detect_or_rq_support",
+      "notes": "Role creation/alter guards tolerate pre-created roles or single-role test bootstrap while keeping real PostgreSQL role and EXECUTE ACL enforcement via SET ROLE tests; rq._assert_session_role permits rolsuper test harness connections alongside exact session_user roles."
+    }
+  },
+  "default_privileges": [
+    "ALTER DEFAULT PRIVILEGES FOR ROLE rq_owner IN SCHEMA rq REVOKE ALL ON TABLES FROM PUBLIC",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE rq_owner IN SCHEMA rq REVOKE ALL ON SEQUENCES FROM PUBLIC",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE rq_owner IN SCHEMA rq REVOKE ALL ON FUNCTIONS FROM PUBLIC",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE rq_owner IN SCHEMA rq_recovery REVOKE ALL ON TABLES FROM PUBLIC",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE rq_owner IN SCHEMA rq_recovery REVOKE ALL ON SEQUENCES FROM PUBLIC",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE rq_owner IN SCHEMA rq_recovery REVOKE ALL ON FUNCTIONS FROM PUBLIC"
+  ],
+  "base_table_dml_policy": {
+    "runtime_direct_insert_update_delete": false,
+    "migrator_runtime_dml": false,
+    "recovery_direct_table_dml": false,
+    "owner_only_mutation_via_security_definer": true
+  },
+  "restricted_sensitive_relations": [
+    "rq.passkeys",
+    "rq.preauth_contexts",
+    "rq.auth_challenges",
+    "rq.human_sessions",
+    "rq.enrollment_intents",
+    "rq.operation_proofs",
+    "rq.producer_credentials",
+    "rq.producer_credential_intents",
+    "rq.signing_key_versions",
+    "rq.signing_delivery_intents",
+    "rq.event_payloads",
+    "rq.event_wire_envelopes"
+  ],
+  "private_helper_functions": [
+    {
+      "schema": "rq",
+      "name": "_assert_session_role",
+      "qualified_name": "rq._assert_session_role",
+      "identity_args": "p_allowed_roles text[]",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_delivery_shard",
+      "qualified_name": "rq._delivery_shard",
+      "identity_args": "p_delivery_id uuid",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_refill_micro_tokens",
+      "qualified_name": "rq._refill_micro_tokens",
+      "identity_args": "p_tokens_micro bigint, p_capacity_micro bigint, p_refill_micro_per_sec bigint, p_remainder_num bigint, p_last_refill_at timestamp with time zone, p_now timestamp with time zone",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_endpoint_versions_guard",
+      "qualified_name": "rq._trg_endpoint_versions_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_event_payloads_guard",
+      "qualified_name": "rq._trg_event_payloads_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_event_schema_versions_guard",
+      "qualified_name": "rq._trg_event_schema_versions_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_event_wire_envelopes_guard",
+      "qualified_name": "rq._trg_event_wire_envelopes_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_events_immutable",
+      "qualified_name": "rq._trg_events_immutable",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_immutable_row",
+      "qualified_name": "rq._trg_immutable_row",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_outbox_publications_guard",
+      "qualified_name": "rq._trg_outbox_publications_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_policy_versions_guard",
+      "qualified_name": "rq._trg_policy_versions_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_producer_scope_versions_guard",
+      "qualified_name": "rq._trg_producer_scope_versions_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_receiver_contract_versions_guard",
+      "qualified_name": "rq._trg_receiver_contract_versions_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_representation_profile_versions_guard",
+      "qualified_name": "rq._trg_representation_profile_versions_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_signing_policies_guard",
+      "qualified_name": "rq._trg_signing_policies_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_subscription_topology_ranges_guard",
+      "qualified_name": "rq._trg_subscription_topology_ranges_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq",
+      "name": "_trg_subscription_versions_guard",
+      "qualified_name": "rq._trg_subscription_versions_guard",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "_trg_completed_operation_immutable",
+      "qualified_name": "rq_recovery._trg_completed_operation_immutable",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "_trg_review_immutable",
+      "qualified_name": "rq_recovery._trg_review_immutable",
+      "identity_args": "",
+      "owner": "rq_owner",
+      "security_definer": false,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "_verify_review_and_record_attempt",
+      "qualified_name": "rq_recovery._verify_review_and_record_attempt",
+      "identity_args": "p_action_id uuid, p_expected_kind text, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea, OUT out_already_done boolean, OUT out_existing_result jsonb, OUT out_action rq_recovery.actions, OUT out_op rq_recovery.operations, OUT out_review rq_recovery.reviews, OUT out_exec_attempt_id uuid",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": []
+    }
+  ],
+  "functions": [
+    {
+      "schema": "rq",
+      "name": "cmd_attempt_finalize",
+      "qualified_name": "rq.cmd_attempt_finalize",
+      "identity_args": "p_attempt_id uuid, p_worker_instance_id uuid, p_control_epoch uuid, p_expected_fencing_token bigint, p_attempt_state text, p_outcome_class text, p_response_status integer, p_response_body_sha256 bytea, p_response_byte_count integer, p_safe_error_code text, p_retry_decision text, p_retry_reason_code text, p_retry_policy_version text, p_selected_delay_ms bigint, p_selected_backoff_ms bigint, p_retry_after_parse_class text, p_retry_after_ms bigint, p_next_eligible_at timestamp with time zone",
+      "function_args": "p_attempt_id uuid, p_worker_instance_id uuid, p_control_epoch uuid, p_expected_fencing_token bigint, p_attempt_state text, p_outcome_class text, p_response_status integer, p_response_body_sha256 bytea, p_response_byte_count integer, p_safe_error_code text, p_retry_decision text, p_retry_reason_code text, p_retry_policy_version text, p_selected_delay_ms bigint, p_selected_backoff_ms bigint, p_retry_after_parse_class text, p_retry_after_ms bigint, p_next_eligible_at timestamp with time zone",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_sender"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_circuit_probe_request",
+      "qualified_name": "rq.cmd_circuit_probe_request",
+      "identity_args": "p_request_id uuid, p_tenant_id uuid, p_project_id uuid, p_endpoint_id uuid, p_endpoint_version bigint, p_expected_circuit_generation bigint, p_requested_by uuid, p_receipt_id uuid, p_key_sha256 bytea, p_submitted_shape_sha256 bytea",
+      "function_args": "p_request_id uuid, p_tenant_id uuid, p_project_id uuid, p_endpoint_id uuid, p_endpoint_version bigint, p_expected_circuit_generation bigint, p_requested_by uuid, p_receipt_id uuid, p_key_sha256 bytea, p_submitted_shape_sha256 bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_compact_delivery_total_deltas",
+      "qualified_name": "rq.cmd_compact_delivery_total_deltas",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid DEFAULT NULL::uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_coordinator",
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_coordinator_reap_expired",
+      "qualified_name": "rq.cmd_coordinator_reap_expired",
+      "identity_args": "p_instance_id uuid, p_control_epoch uuid, p_batch_limit integer",
+      "function_args": "p_instance_id uuid, p_control_epoch uuid, p_batch_limit integer DEFAULT 50",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_coordinator"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_dispatch_prepare",
+      "qualified_name": "rq.cmd_dispatch_prepare",
+      "identity_args": "p_request_id uuid, p_dispatch_domain_id uuid, p_worker_instance_id uuid, p_control_epoch uuid, p_request_sha256 bytea, p_delivery_id uuid, p_attempt_id uuid, p_claim_lease_ms bigint",
+      "function_args": "p_request_id uuid, p_dispatch_domain_id uuid, p_worker_instance_id uuid, p_control_epoch uuid, p_request_sha256 bytea, p_delivery_id uuid, p_attempt_id uuid, p_claim_lease_ms bigint",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_sender"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_egress_decision_record",
+      "qualified_name": "rq.cmd_egress_decision_record",
+      "identity_args": "p_decision_id uuid, p_tenant_id uuid, p_project_id uuid, p_endpoint_id uuid, p_endpoint_version bigint, p_delivery_attempt_id uuid, p_verification_attempt_id uuid, p_runtime_instance_id uuid, p_control_epoch uuid, p_network_policy_version text, p_registry_ipv4_sha256 bytea, p_registry_ipv6_sha256 bytea, p_authority_sha256 bytea, p_answer_set_sha256 bytea, p_selected_address_sha256 bytea, p_selected_family integer, p_peer_address_sha256 bytea, p_decision text, p_reason_code text, p_expires_at timestamp with time zone",
+      "function_args": "p_decision_id uuid, p_tenant_id uuid, p_project_id uuid, p_endpoint_id uuid, p_endpoint_version bigint, p_delivery_attempt_id uuid, p_verification_attempt_id uuid, p_runtime_instance_id uuid, p_control_epoch uuid, p_network_policy_version text, p_registry_ipv4_sha256 bytea, p_registry_ipv6_sha256 bytea, p_authority_sha256 bytea, p_answer_set_sha256 bytea, p_selected_address_sha256 bytea, p_selected_family integer, p_peer_address_sha256 bytea, p_decision text, p_reason_code text, p_expires_at timestamp with time zone",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_sender"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_event_admit",
+      "qualified_name": "rq.cmd_event_admit",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid, p_actor_principal_id uuid, p_producer_id uuid, p_producer_namespace text, p_business_key text, p_business_key_sha256 bytea, p_idempotency_key_sha256 bytea, p_submitted_shape_sha256 bytea, p_effective_request_sha256 bytea, p_event_type_id uuid, p_event_schema_version integer, p_content bytea, p_content_sha256 bytea, p_wire_envelope_bytes bytea, p_wire_envelope_sha256 bytea, p_broker_envelope_bytes bytea, p_broker_envelope_sha256 bytea, p_producer_event_time timestamp with time zone, p_delivery_deadline_at timestamp with time zone, p_applied_defaults jsonb, p_retention_policy_version text, p_event_id uuid, p_payload_id uuid, p_wire_envelope_id uuid, p_outbox_id uuid, p_receipt_id uuid, p_audit_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid, p_actor_principal_id uuid, p_producer_id uuid, p_producer_namespace text, p_business_key text, p_business_key_sha256 bytea, p_idempotency_key_sha256 bytea, p_submitted_shape_sha256 bytea, p_effective_request_sha256 bytea, p_event_type_id uuid, p_event_schema_version integer, p_content bytea, p_content_sha256 bytea, p_wire_envelope_bytes bytea, p_wire_envelope_sha256 bytea, p_broker_envelope_bytes bytea, p_broker_envelope_sha256 bytea, p_producer_event_time timestamp with time zone, p_delivery_deadline_at timestamp with time zone, p_applied_defaults jsonb, p_retention_policy_version text, p_event_id uuid, p_payload_id uuid, p_wire_envelope_id uuid, p_outbox_id uuid, p_receipt_id uuid, p_audit_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_event_resolve",
+      "qualified_name": "rq.cmd_event_resolve",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid, p_actor_principal_id uuid, p_producer_namespace text, p_business_key_sha256 bytea, p_idempotency_key_sha256 bytea, p_submitted_shape_sha256 bytea",
+      "function_args": "p_tenant_id uuid, p_project_id uuid, p_actor_principal_id uuid, p_producer_namespace text, p_business_key_sha256 bytea, p_idempotency_key_sha256 bytea, p_submitted_shape_sha256 bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_fanout_claim",
+      "qualified_name": "rq.cmd_fanout_claim",
+      "identity_args": "p_event_id uuid, p_instance_id uuid, p_control_epoch uuid, p_claim_lease_ms bigint",
+      "function_args": "p_event_id uuid, p_instance_id uuid, p_control_epoch uuid, p_claim_lease_ms bigint",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_fanout"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_fanout_page",
+      "qualified_name": "rq.cmd_fanout_page",
+      "identity_args": "p_event_id uuid, p_instance_id uuid, p_control_epoch uuid, p_expected_claim_generation bigint, p_next_cursor uuid, p_complete boolean, p_outcomes jsonb",
+      "function_args": "p_event_id uuid, p_instance_id uuid, p_control_epoch uuid, p_expected_claim_generation bigint, p_next_cursor uuid, p_complete boolean, p_outcomes jsonb",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_fanout"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_inbox_accept",
+      "qualified_name": "rq.cmd_inbox_accept",
+      "identity_args": "p_outbox_id uuid, p_publication_generation bigint, p_event_id uuid, p_project_id uuid, p_topology_version bigint, p_envelope_sha256 bytea, p_broker_generation_id uuid, p_stream_sequence bigint, p_inbox_id uuid, p_instance_id uuid, p_control_epoch uuid",
+      "function_args": "p_outbox_id uuid, p_publication_generation bigint, p_event_id uuid, p_project_id uuid, p_topology_version bigint, p_envelope_sha256 bytea, p_broker_generation_id uuid, p_stream_sequence bigint, p_inbox_id uuid, p_instance_id uuid, p_control_epoch uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_fanout"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_late_delivery_observe",
+      "qualified_name": "rq.cmd_late_delivery_observe",
+      "identity_args": "p_observation_id uuid, p_delivery_id uuid, p_attempt_id uuid, p_source_instance_id uuid, p_observation_key_sha256 bytea, p_facts_sha256 bytea, p_observation_kind text, p_safe_facts jsonb",
+      "function_args": "p_observation_id uuid, p_delivery_id uuid, p_attempt_id uuid, p_source_instance_id uuid, p_observation_key_sha256 bytea, p_facts_sha256 bytea, p_observation_kind text, p_safe_facts jsonb",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_coordinator",
+        "rq_sender"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_order_skip_admit",
+      "qualified_name": "rq.cmd_order_skip_admit",
+      "identity_args": "p_proposal_id uuid, p_review_id uuid, p_actor_principal_id uuid, p_disposition_id uuid, p_receipt_id uuid, p_idempotency_key_sha256 bytea",
+      "function_args": "p_proposal_id uuid, p_review_id uuid, p_actor_principal_id uuid, p_disposition_id uuid, p_receipt_id uuid, p_idempotency_key_sha256 bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_outbox_claim",
+      "qualified_name": "rq.cmd_outbox_claim",
+      "identity_args": "p_outbox_id uuid, p_instance_id uuid, p_control_epoch uuid, p_claim_lease_ms bigint",
+      "function_args": "p_outbox_id uuid, p_instance_id uuid, p_control_epoch uuid, p_claim_lease_ms bigint",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_relay"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_outbox_observe",
+      "qualified_name": "rq.cmd_outbox_observe",
+      "identity_args": "p_outbox_id uuid, p_publication_generation bigint, p_instance_id uuid, p_control_epoch uuid, p_expected_claim_generation bigint, p_outcome text, p_broker_generation_id uuid, p_stream_name text, p_stream_sequence bigint, p_ack_duplicate boolean, p_safe_error_code text, p_next_publish_at timestamp with time zone, p_observation_id uuid",
+      "function_args": "p_outbox_id uuid, p_publication_generation bigint, p_instance_id uuid, p_control_epoch uuid, p_expected_claim_generation bigint, p_outcome text, p_broker_generation_id uuid, p_stream_name text, p_stream_sequence bigint, p_ack_duplicate boolean, p_safe_error_code text, p_next_publish_at timestamp with time zone, p_observation_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_relay"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_outbox_recovery_generation",
+      "qualified_name": "rq.cmd_outbox_recovery_generation",
+      "identity_args": "p_outbox_id uuid, p_episode_id uuid, p_instance_id uuid, p_control_epoch uuid, p_envelope_bytes bytea, p_envelope_sha256 bytea, p_broker_message_id text, p_reason_code text",
+      "function_args": "p_outbox_id uuid, p_episode_id uuid, p_instance_id uuid, p_control_epoch uuid, p_envelope_bytes bytea, p_envelope_sha256 bytea, p_broker_message_id text, p_reason_code text",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_coordinator"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_producer_credential_intent_finalize",
+      "qualified_name": "rq.cmd_producer_credential_intent_finalize",
+      "identity_args": "p_intent_id uuid, p_control_epoch uuid, p_next_state text, p_credential_id uuid, p_secret_digest bytea, p_expires_at timestamp with time zone",
+      "function_args": "p_intent_id uuid, p_control_epoch uuid, p_next_state text, p_credential_id uuid, p_secret_digest bytea, p_expires_at timestamp with time zone",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_signing_issuer"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_receiver_receipt_observe",
+      "qualified_name": "rq.cmd_receiver_receipt_observe",
+      "identity_args": "p_observation_id uuid, p_delivery_id uuid, p_attempt_id uuid, p_receipt_reference text, p_receipt_facts_sha256 bytea, p_request_wire_sha256 bytea, p_proof_sha256 bytea, p_key_id text, p_receiver_contract_id uuid, p_receiver_contract_version bigint, p_receipt_facts jsonb, p_verification_profile_version text, p_source_kind text, p_recorded_by uuid, p_state text",
+      "function_args": "p_observation_id uuid, p_delivery_id uuid, p_attempt_id uuid, p_receipt_reference text, p_receipt_facts_sha256 bytea, p_request_wire_sha256 bytea, p_proof_sha256 bytea, p_key_id text, p_receiver_contract_id uuid, p_receiver_contract_version bigint, p_receipt_facts jsonb, p_verification_profile_version text, p_source_kind text, p_recorded_by uuid, p_state text",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_sender"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_replay_admit",
+      "qualified_name": "rq.cmd_replay_admit",
+      "identity_args": "p_proposal_id uuid, p_expected_proposal_version bigint, p_candidate_sha256 bytea, p_review_id uuid, p_actor_principal_id uuid, p_new_delivery_id uuid, p_receipt_id uuid, p_idempotency_key_sha256 bytea",
+      "function_args": "p_proposal_id uuid, p_expected_proposal_version bigint, p_candidate_sha256 bytea, p_review_id uuid, p_actor_principal_id uuid, p_new_delivery_id uuid, p_receipt_id uuid, p_idempotency_key_sha256 bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_replay_propose",
+      "qualified_name": "rq.cmd_replay_propose",
+      "identity_args": "p_proposal_id uuid, p_delivery_id uuid, p_proposer_principal_id uuid, p_expected_delivery_version bigint, p_target_subscription_version bigint, p_target_endpoint_version bigint, p_wire_envelope_id uuid, p_strategy text, p_ordering_strategy text, p_representation_profile_id uuid, p_representation_profile_version bigint, p_receiver_contract_id uuid, p_receiver_contract_version bigint, p_consumer_event_key_sha256 bytea, p_candidate_sha256 bytea, p_requested_deadline_at timestamp with time zone",
+      "function_args": "p_proposal_id uuid, p_delivery_id uuid, p_proposer_principal_id uuid, p_expected_delivery_version bigint, p_target_subscription_version bigint, p_target_endpoint_version bigint, p_wire_envelope_id uuid, p_strategy text, p_ordering_strategy text, p_representation_profile_id uuid, p_representation_profile_version bigint, p_receiver_contract_id uuid, p_receiver_contract_version bigint, p_consumer_event_key_sha256 bytea, p_candidate_sha256 bytea, p_requested_deadline_at timestamp with time zone",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_replay_review",
+      "qualified_name": "rq.cmd_replay_review",
+      "identity_args": "p_review_id uuid, p_proposal_id uuid, p_expected_proposal_version bigint, p_candidate_sha256 bytea, p_reviewer_principal_id uuid, p_reviewer_authority_version bigint, p_decision text",
+      "function_args": "p_review_id uuid, p_proposal_id uuid, p_expected_proposal_version bigint, p_candidate_sha256 bytea, p_reviewer_principal_id uuid, p_reviewer_authority_version bigint, p_decision text",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_retention_finalize",
+      "qualified_name": "rq.cmd_retention_finalize",
+      "identity_args": "p_action_id uuid, p_instance_id uuid, p_control_epoch uuid, p_claim_generation bigint",
+      "function_args": "p_action_id uuid, p_instance_id uuid, p_control_epoch uuid, p_claim_generation bigint",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_coordinator"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_runtime_heartbeat",
+      "qualified_name": "rq.cmd_runtime_heartbeat",
+      "identity_args": "p_instance_id uuid, p_control_epoch uuid, p_lease_ms bigint",
+      "function_args": "p_instance_id uuid, p_control_epoch uuid, p_lease_ms bigint",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_coordinator",
+        "rq_fanout",
+        "rq_recovery",
+        "rq_relay",
+        "rq_sender",
+        "rq_signing_issuer"
+      ],
+      "denied_roles": [
+        "rq_reporter",
+        "rq_migrator"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_runtime_register",
+      "qualified_name": "rq.cmd_runtime_register",
+      "identity_args": "p_instance_id uuid, p_process_role text, p_database_role text, p_control_epoch uuid, p_build_reference text, p_lease_ms bigint, p_approved_slots integer",
+      "function_args": "p_instance_id uuid, p_process_role text, p_database_role text, p_control_epoch uuid, p_build_reference text, p_lease_ms bigint, p_approved_slots integer DEFAULT 8",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_coordinator",
+        "rq_fanout",
+        "rq_recovery",
+        "rq_relay",
+        "rq_sender",
+        "rq_signing_issuer"
+      ],
+      "denied_roles": [
+        "rq_reporter",
+        "rq_migrator"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_send_start",
+      "qualified_name": "rq.cmd_send_start",
+      "identity_args": "p_attempt_id uuid, p_worker_instance_id uuid, p_control_epoch uuid, p_expected_fencing_token bigint, p_network_budget_ms bigint",
+      "function_args": "p_attempt_id uuid, p_worker_instance_id uuid, p_control_epoch uuid, p_expected_fencing_token bigint, p_network_budget_ms bigint DEFAULT 10000",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_sender"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_signing_delivery_finalize",
+      "qualified_name": "rq.cmd_signing_delivery_finalize",
+      "identity_args": "p_intent_id uuid, p_control_epoch uuid, p_next_state text",
+      "function_args": "p_intent_id uuid, p_control_epoch uuid, p_next_state text",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_signing_issuer"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_suppression_admit",
+      "qualified_name": "rq.cmd_suppression_admit",
+      "identity_args": "p_proposal_id uuid, p_review_id uuid, p_actor_principal_id uuid, p_receipt_id uuid, p_idempotency_key_sha256 bytea",
+      "function_args": "p_proposal_id uuid, p_review_id uuid, p_actor_principal_id uuid, p_receipt_id uuid, p_idempotency_key_sha256 bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_verification_attempt_claim",
+      "qualified_name": "rq.cmd_verification_attempt_claim",
+      "identity_args": "p_intent_id uuid, p_attempt_id uuid, p_instance_id uuid, p_control_epoch uuid, p_claim_lease_ms bigint",
+      "function_args": "p_intent_id uuid, p_attempt_id uuid, p_instance_id uuid, p_control_epoch uuid, p_claim_lease_ms bigint",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_sender"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_verification_attempt_finalize",
+      "qualified_name": "rq.cmd_verification_attempt_finalize",
+      "identity_args": "p_attempt_id uuid, p_instance_id uuid, p_control_epoch uuid, p_outcome text, p_response_status integer, p_proof_sha256 bytea, p_network_policy_version text, p_safe_reason_code text, p_event_id uuid",
+      "function_args": "p_attempt_id uuid, p_instance_id uuid, p_control_epoch uuid, p_outcome text, p_response_status integer, p_proof_sha256 bytea, p_network_policy_version text, p_safe_reason_code text, p_event_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_sender"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_watch_lease_close",
+      "qualified_name": "rq.cmd_watch_lease_close",
+      "identity_args": "p_lease_id uuid",
+      "function_args": "p_lease_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_coordinator"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_watch_lease_open",
+      "qualified_name": "rq.cmd_watch_lease_open",
+      "identity_args": "p_lease_id uuid, p_tenant_id uuid, p_project_id uuid, p_principal_id uuid, p_actor_kind text, p_session_id uuid, p_producer_credential_id uuid, p_resource_kind text, p_resource_id uuid, p_runtime_instance_id uuid, p_control_epoch uuid, p_auth_cutoff_at timestamp with time zone, p_stream_cutoff_at timestamp with time zone",
+      "function_args": "p_lease_id uuid, p_tenant_id uuid, p_project_id uuid, p_principal_id uuid, p_actor_kind text, p_session_id uuid, p_producer_credential_id uuid, p_resource_kind text, p_resource_id uuid, p_runtime_instance_id uuid, p_control_epoch uuid, p_auth_cutoff_at timestamp with time zone, p_stream_cutoff_at timestamp with time zone",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "cmd_watch_lease_renew",
+      "qualified_name": "rq.cmd_watch_lease_renew",
+      "identity_args": "p_lease_id uuid, p_control_epoch uuid, p_auth_cutoff_at timestamp with time zone",
+      "function_args": "p_lease_id uuid, p_control_epoch uuid, p_auth_cutoff_at timestamp with time zone",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "command"
+    },
+    {
+      "schema": "rq",
+      "name": "read_delivery_safe",
+      "qualified_name": "rq.read_delivery_safe",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid, p_delivery_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid, p_delivery_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_coordinator",
+        "rq_reporter"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "safe_read"
+    },
+    {
+      "schema": "rq",
+      "name": "read_event_delivery_totals",
+      "qualified_name": "rq.read_event_delivery_totals",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_coordinator",
+        "rq_recovery",
+        "rq_reporter"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "safe_read"
+    },
+    {
+      "schema": "rq",
+      "name": "read_event_payload_bytes",
+      "qualified_name": "rq.read_event_payload_bytes",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_fanout"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "restricted_byte_read"
+    },
+    {
+      "schema": "rq",
+      "name": "read_event_safe",
+      "qualified_name": "rq.read_event_safe",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_coordinator",
+        "rq_reporter"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "safe_read"
+    },
+    {
+      "schema": "rq",
+      "name": "read_installation_status",
+      "qualified_name": "rq.read_installation_status",
+      "identity_args": "",
+      "function_args": "",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_coordinator",
+        "rq_fanout",
+        "rq_recovery",
+        "rq_relay",
+        "rq_reporter",
+        "rq_sender",
+        "rq_signing_issuer"
+      ],
+      "denied_roles": [
+        "rq_migrator"
+      ],
+      "projection_class": "safe_read"
+    },
+    {
+      "schema": "rq",
+      "name": "read_project_delivery_totals",
+      "qualified_name": "rq.read_project_delivery_totals",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_coordinator",
+        "rq_recovery",
+        "rq_reporter"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "safe_read"
+    },
+    {
+      "schema": "rq",
+      "name": "read_schema_migrations",
+      "qualified_name": "rq.read_schema_migrations",
+      "identity_args": "",
+      "function_args": "",
+      "return_type": "TABLE(migration_id text, checksum bytea, applied_at timestamp with time zone, source_reference text, runner_version text)",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_coordinator",
+        "rq_fanout",
+        "rq_migrator",
+        "rq_recovery",
+        "rq_relay",
+        "rq_reporter",
+        "rq_sender",
+        "rq_signing_issuer"
+      ],
+      "denied_roles": [],
+      "projection_class": "safe_read"
+    },
+    {
+      "schema": "rq",
+      "name": "read_wire_envelope_bytes",
+      "qualified_name": "rq.read_wire_envelope_bytes",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid, p_wire_envelope_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid, p_wire_envelope_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_api",
+        "rq_fanout",
+        "rq_sender"
+      ],
+      "denied_roles": [
+        "rq_relay",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator",
+        "rq_recovery"
+      ],
+      "projection_class": "restricted_byte_read"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_action_plan",
+      "qualified_name": "rq_recovery.cmd_action_plan",
+      "identity_args": "p_action_id uuid, p_operation_id uuid, p_ordinal integer, p_kind text, p_scope_kind text, p_tenant_id uuid, p_project_id uuid, p_target_id uuid, p_expected_target_version bigint, p_expected_control_epoch uuid, p_expected_facts_sha256 bytea, p_proposed_facts_sha256 bytea, p_requester_reference text, p_reason_code text, p_evidence_reference text, p_typed_plan jsonb",
+      "function_args": "p_action_id uuid, p_operation_id uuid, p_ordinal integer, p_kind text, p_scope_kind text, p_tenant_id uuid, p_project_id uuid, p_target_id uuid, p_expected_target_version bigint, p_expected_control_epoch uuid, p_expected_facts_sha256 bytea, p_proposed_facts_sha256 bytea, p_requester_reference text, p_reason_code text, p_evidence_reference text, p_typed_plan jsonb",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_action_review",
+      "qualified_name": "rq_recovery.cmd_action_review",
+      "identity_args": "p_review_id uuid, p_action_id uuid, p_plan_sha256 bytea, p_target_epoch uuid, p_expected_facts_sha256 bytea, p_proposed_facts_sha256 bytea, p_reviewer_reference text, p_decision text, p_reject_reason_code text, p_expires_at timestamp with time zone, p_authority_evidence_digest bytea",
+      "function_args": "p_review_id uuid, p_action_id uuid, p_plan_sha256 bytea, p_target_epoch uuid, p_expected_facts_sha256 bytea, p_proposed_facts_sha256 bytea, p_reviewer_reference text, p_decision text, p_reject_reason_code text, p_expires_at timestamp with time zone, p_authority_evidence_digest bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_continue_publication_episode",
+      "qualified_name": "rq_recovery.cmd_continue_publication_episode",
+      "identity_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "function_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_establish_target_epoch",
+      "qualified_name": "rq_recovery.cmd_establish_target_epoch",
+      "identity_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "function_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_incident_close",
+      "qualified_name": "rq_recovery.cmd_incident_close",
+      "identity_args": "p_incident_id uuid, p_expected_version bigint, p_remaining_risk_decision_code text, p_operator_reference text",
+      "function_args": "p_incident_id uuid, p_expected_version bigint, p_remaining_risk_decision_code text, p_operator_reference text",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_incident_open",
+      "qualified_name": "rq_recovery.cmd_incident_open",
+      "identity_args": "p_incident_id uuid, p_external_operation_id uuid, p_incident_reference text, p_scope_kind text, p_tenant_id uuid, p_project_id uuid",
+      "function_args": "p_incident_id uuid, p_external_operation_id uuid, p_incident_reference text, p_scope_kind text, p_tenant_id uuid DEFAULT NULL::uuid, p_project_id uuid DEFAULT NULL::uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_operation_create",
+      "qualified_name": "rq_recovery.cmd_operation_create",
+      "identity_args": "p_operation_id uuid, p_incident_id uuid, p_external_operation_id uuid, p_source_epoch uuid, p_target_epoch uuid, p_target_database_identity_digest bytea, p_plan_sha256 bytea, p_requester_reference text",
+      "function_args": "p_operation_id uuid, p_incident_id uuid, p_external_operation_id uuid, p_source_epoch uuid, p_target_epoch uuid, p_target_database_identity_digest bytea, p_plan_sha256 bytea, p_requester_reference text",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_project_maintenance_acquire",
+      "qualified_name": "rq_recovery.cmd_project_maintenance_acquire",
+      "identity_args": "p_operation_id uuid, p_tenant_id uuid, p_project_id uuid, p_expected_project_version bigint, p_operator_reference text",
+      "function_args": "p_operation_id uuid, p_tenant_id uuid, p_project_id uuid, p_expected_project_version bigint, p_operator_reference text",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_project_maintenance_release",
+      "qualified_name": "rq_recovery.cmd_project_maintenance_release",
+      "identity_args": "p_operation_id uuid, p_tenant_id uuid, p_project_id uuid, p_expected_maintenance_version bigint, p_operator_reference text",
+      "function_args": "p_operation_id uuid, p_tenant_id uuid, p_project_id uuid, p_expected_maintenance_version bigint, p_operator_reference text",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_rebuild_projection",
+      "qualified_name": "rq_recovery.cmd_rebuild_projection",
+      "identity_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "function_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_reconcile_reservations",
+      "qualified_name": "rq_recovery.cmd_reconcile_reservations",
+      "identity_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "function_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_record_receiver_comparison",
+      "qualified_name": "rq_recovery.cmd_record_receiver_comparison",
+      "identity_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "function_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_retire_stale_claim",
+      "qualified_name": "rq_recovery.cmd_retire_stale_claim",
+      "identity_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "function_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "cmd_set_recovery_gate",
+      "qualified_name": "rq_recovery.cmd_set_recovery_gate",
+      "identity_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "function_args": "p_action_id uuid, p_operator_reference text, p_execution_nonce_digest bytea, p_target_database_identity_digest bytea",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_command"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "read_claim_inventory",
+      "qualified_name": "rq_recovery.read_claim_inventory",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid",
+      "function_args": "p_tenant_id uuid DEFAULT NULL::uuid, p_project_id uuid DEFAULT NULL::uuid",
+      "return_type": "TABLE(claim_kind text, resource_id uuid, tenant_id uuid, project_id uuid, owner_instance_id uuid, control_epoch uuid, claim_generation bigint, claim_expires_at timestamp with time zone, state text, version bigint)",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_read"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "read_obligation_inventory",
+      "qualified_name": "rq_recovery.read_obligation_inventory",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid DEFAULT NULL::uuid",
+      "return_type": "TABLE(project_id uuid, stored_pending_events bigint, derived_pending_events bigint, stored_active_slots integer, derived_held_slots bigint, stored_unmaterialized_slots bigint, derived_unresolved_slots bigint)",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_read"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "read_operation_result",
+      "qualified_name": "rq_recovery.read_operation_result",
+      "identity_args": "p_action_id uuid",
+      "function_args": "p_action_id uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_read"
+    },
+    {
+      "schema": "rq_recovery",
+      "name": "read_projection_source_counts",
+      "qualified_name": "rq_recovery.read_projection_source_counts",
+      "identity_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid",
+      "function_args": "p_tenant_id uuid, p_project_id uuid, p_event_id uuid DEFAULT NULL::uuid",
+      "return_type": "jsonb",
+      "owner": "rq_owner",
+      "security_definer": true,
+      "search_path": "pg_catalog",
+      "allowed_roles": [
+        "rq_recovery"
+      ],
+      "denied_roles": [
+        "rq_api",
+        "rq_relay",
+        "rq_fanout",
+        "rq_sender",
+        "rq_coordinator",
+        "rq_reporter",
+        "rq_signing_issuer",
+        "rq_migrator"
+      ],
+      "projection_class": "protected_recovery_read"
+    }
+  ]
+}

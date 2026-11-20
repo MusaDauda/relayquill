@@ -12,12 +12,14 @@
   },
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "artifacts"
   ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint --max-warnings 0 src"
+    "lint": "eslint --max-warnings 0 src",
+    "test": "node --test test"
   },
   "dependencies": {
     "@relayquill/contracts": "0.1.0",

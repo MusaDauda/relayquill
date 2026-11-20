@@ -54,17 +54,17 @@ const HYGIENE_RULES = [
   {
     id: "spec_day_ref",
     regex: new RegExp(`(?:^|[^a-z])${DAY_WORD}[\\s_-]*0?5(?![0-9])`, "i"),
-    message: "Forbidden reference to external specification numbering"
+    message: "Forbidden scratch numbering reference"
   },
   {
     id: "spec_doc_ref",
     regex: new RegExp(`${HAND_BOOK}`, "i"),
-    message: "Forbidden specification artifact noun"
+    message: "Forbidden scratch artifact noun"
   },
   {
     id: "spec_plan_ref",
     regex: new RegExp(`${BLUE_PRINT}`, "i"),
-    message: "Forbidden specification artifact noun"
+    message: "Forbidden scratch artifact noun"
   },
   {
     id: "section_num_ref",
@@ -297,7 +297,7 @@ export function checkTrackedFiles(rootDir, options = {}) {
         file: relPath,
         line: 1,
         rule: "tracked_spec_dir",
-        message: "External specification directory must never be tracked by git"
+        message: "Local scratch directory must never be tracked by git"
       });
     }
   }

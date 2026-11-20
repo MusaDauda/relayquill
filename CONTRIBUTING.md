@@ -73,7 +73,7 @@ npm run boundaries
 
 - `npm run hygiene` (`tools/check-hygiene.mjs`) scans all tracked and untracked non-ignored files plus git commit history (`git log --all`) to enforce:
   - `.gitignore` and `.dockerignore` exclusion rules.
-  - Zero external specification numbering, forbidden specification artifact nouns, or third-party automated tooling attribution trailers in source files, comments, documentation, or commit messages.
+  - Zero scratch artifact markers or third-party automated tooling attribution trailers in source files, comments, documentation, or commit messages.
   - Zero raw secret JSON keys (`*password`, `*secret`, `*private_key`, `*nkey_seed`, `*creds`, `*api_key`, `*signing_key`, `*token`), PEM headers, `rq_p1.` credential literals, credential-bearing PostgreSQL URLs, machine-specific user paths, or hardcoded `.sock` paths inside `config/`.
 - `npm run boundaries` (`tools/verify-import-boundaries.mjs`) validates all 22 workspaces, AST imports, and SDK bundle metafiles.
 
@@ -158,6 +158,6 @@ node tests/e2e/run.mjs
 2. **One Logical Slice Per Commit**:
    Stage only the files belonging to a verified logical change. Never mix unrelated workspace refactors, untracked build outputs (`dist/`, `build/`, `*.tsbuildinfo`, `*.tgz`), or temporary debug files into a commit.
 3. **Strict Commit Message Hygiene**:
-   `npm run hygiene` inspects every commit author, committer, and message body in `git log --all`. Commit messages must contain **zero** external specification numbering, forbidden specification nouns, or automated attribution trailers.
+   `npm run hygiene` inspects every commit author, committer, and message body in `git log --all`. Commit messages must contain **zero** scratch artifact markers or automated attribution trailers.
 4. **No Secrets or Environment Files**:
    Never stage `.env`, `*.pem`, `*.key`, `*.crt`, `*.seed`, `*.creds`, `*.tfvars`, or `infra/secrets/`. Always run `npm run hygiene` immediately before and after committing.

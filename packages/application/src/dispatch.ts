@@ -489,9 +489,6 @@ export class DispatchService<TTx> {
           EndpointId,
           WdrrScopeState & { readonly endpointId: EndpointId }
         >();
-        const visitedTenants = new Set<TenantId>();
-        const visitedProjects = new Set<ProjectId>();
-        const visitedEndpoints = new Set<EndpointId>();
         const bucketCache = new Map<string, MicrotokenRateBucketRecord>();
         const circuitCache = new Map<EndpointId, EndpointCircuitSnapshot>();
         const projectSlotsUsed = new Map<ProjectId, number>();
@@ -506,6 +503,9 @@ export class DispatchService<TTx> {
         let madeProgressInRound = true;
         while (selections.length < maximumCount && madeProgressInRound) {
           madeProgressInRound = false;
+          const visitedTenants = new Set<TenantId>();
+          const visitedProjects = new Set<ProjectId>();
+          const visitedEndpoints = new Set<EndpointId>();
 
           for (const rawTenant of tenantStatesRaw) {
             if (selections.length >= maximumCount) {

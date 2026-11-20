@@ -2792,7 +2792,7 @@ BEGIN
   ELSIF p_attempt_state = 'failed_before_send' THEN
     IF v_now >= v_delivery.deadline_at THEN
       v_target_del_state := 'expired';
-    ELSIF v_delivery.preparation_failure_count + 1 >= 24 THEN
+    ELSIF v_delivery.preparation_failure_count + 1 >= 24 OR p_retry_decision = 'dead_letter' THEN
       v_target_del_state := 'dead_letter';
     ELSE
       v_target_del_state := 'retry_wait';

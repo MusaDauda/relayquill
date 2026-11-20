@@ -464,7 +464,7 @@ export class DeliveryExecutionService<TTx> {
           "endpointVersion"
         ),
         deliveryId: context.deliveryId,
-        deliveryGeneration: parsePositiveInt64String(
+        deliveryGeneration: parseNonNegativeInt64String(
           formatInt64(context.deliveryGeneration, "deliveryGeneration"),
           "deliveryGeneration"
         ),
@@ -484,7 +484,7 @@ export class DeliveryExecutionService<TTx> {
       // Step 5: Assert one-shot egress decision freshness and enforce monotonic network cap.
       const remainingBudgetNs = invokingSnapshot.localCutoffNs - beforeInvokeNs;
       const remainingBudgetMs = Math.max(1, Number(remainingBudgetNs / 1_000_000n));
-      assertAllowedEgressDecision(decision, this.#clock.nowInstant().epochMilliseconds);
+      assertAllowedEgressDecision(decision, Number(this.#monotonicNowNs() / 1_000_000n));
 
       let execResult: EgressExecutionResult;
       try {
@@ -753,7 +753,7 @@ export class DeliveryExecutionService<TTx> {
         getKeyMaterial: this.#getKeyMaterial
       });
 
-      assertAllowedEgressDecision(decision, this.#clock.nowInstant().epochMilliseconds);
+      assertAllowedEgressDecision(decision, Number(this.#monotonicNowNs() / 1_000_000n));
       const execResult = await this.#egressExecutor.execute({
         decision,
         method: "POST",
@@ -924,17 +924,62 @@ export class DeliveryExecutionService<TTx> {
     },
     now: CanonicalUtcTimestamp
   ): Promise<EgressDecision> {
-    const decision = await this.#egressResolver.resolve(destinationUrl, {
-      target: destinationUrl,
-      ...(this.#profile !== undefined || this.#egressConfig !== undefined
-        ? {
-            urlPolicyOptions: {
-              ...(this.#profile !== undefined ? { profile: this.#profile } : {}),
-              ...(this.#egressConfig !== undefined ? { egressConfig: this.#egressConfig } : {})
+    let decision: EgressDecision;
+    try {
+      decision = await this.#egressResolver.resolve(destinationUrl, {
+        target: destinationUrl,
+        monotonicNowMs: () => Number(this.#monotonicNowNs() / 1_000_000n),
+        ...(this.#profile !== undefined || this.#egressConfig !== undefined
+          ? {
+              urlPolicyOptions: {
+                ...(this.#profile !== undefined ? { profile: this.#profile } : {}),
+                ...(this.#egressConfig !== undefined ? { egressConfig: this.#egressConfig } : {})
+              }
             }
-          }
-        : {})
-    });
+          : {})
+      });
+    } catch (err) {
+      if (!(err instanceof AuthorizationDomainError) && !(err instanceof ValidationDomainError)) {
+        throw err;
+      }
+      const observedMs = Number(this.#monotonicNowNs() / 1_000_000n);
+      const authoritySha = sha256HexNode(Buffer.from(destinationUrl, "utf8"));
+      const reasonCode = err.fieldErrors?.[0]?.code ?? err.code;
+      decision = Object.freeze({
+        decisionId: this.#ids.nextUuid(),
+        decision: "denied",
+        reasonCode,
+        networkPolicyVersion: this.#networkPolicyVersion,
+        registryIpv4Sha256: EMPTY_BODY_SHA256,
+        registryIpv6Sha256: EMPTY_BODY_SHA256,
+        authoritySha256: authoritySha,
+        answerSetSha256: EMPTY_BODY_SHA256,
+        selectedAddress: null,
+        selectedAddressSha256: null,
+        selectedFamily: null,
+        target: Object.freeze({
+          urlPolicyVersion: "url_v1" as const,
+          scheme: "https" as const,
+          canonicalUrl: destinationUrl,
+          normalizedHostname: "denied.invalid",
+          port: 443,
+          externalAuthority: "denied.invalid:443",
+          requestTarget: "/",
+          authoritySha256: authoritySha,
+          pathAndQuerySha256: EMPTY_BODY_SHA256,
+          configurationSha256: authoritySha,
+          isFixtureException: false
+        }),
+        cnameChain: Object.freeze([]),
+        observedAt: now,
+        expiresAt: now,
+        observedAtMs: observedMs,
+        expiresAtMs: observedMs,
+        ttlSeconds: 0,
+        oneShot: true,
+        cacheable: false
+      });
+    }
 
     await this.#uow.inTransaction((tx) =>
       this.#deliveryRepo.recordEgressDecision(tx, {

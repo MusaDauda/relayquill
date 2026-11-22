@@ -18,7 +18,11 @@
     "lint": "eslint --max-warnings 0 --no-error-on-unmatched-pattern apps packages examples tools tests",
     "build": "node tools/build-workspaces.mjs",
     "hygiene": "node tools/check-hygiene.mjs",
-    "test": "node --test tests/tooling && npm run test --workspaces --if-present"
+    "test": "node --test \"tests/tooling/*.test.mjs\" && npm run test --workspaces --if-present",
+    "dev": "node tools/dev-stack.mjs",
+    "sdk:pack": "node tools/pack-sdks.mjs",
+    "test:contracts": "node --test \"tests/contracts/*.test.mjs\"",
+    "e2e": "node tests/e2e/run.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.16",

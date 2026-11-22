@@ -11,12 +11,14 @@
     }
   },
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint --max-warnings 0 src",
-    "test": "node --test test"
+    "test": "node --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1"

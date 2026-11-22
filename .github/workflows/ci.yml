@@ -19,7 +19,7 @@ concurrency:
 jobs:
   workspace-gates:
     name: Node 24.16.0 Workspace Gates
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read
@@ -57,11 +57,11 @@ jobs:
         run: npm test
 
       - name: Run PGlite SQL and privilege-manifest contract tests
-        run: node --test tests/contracts
+        run: node --test "tests/contracts/*.test.mjs"
 
   broker-launcher:
     name: Go 1.27 Broker Launcher
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -86,7 +86,7 @@ jobs:
 
   sdk-pack:
     name: SDK Tarball Packing & Consumer Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -108,7 +108,7 @@ jobs:
 
   infra-validation:
     name: Compose & Kubernetes Manifest Validation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -141,7 +141,7 @@ jobs:
 
   e2e:
     name: Playwright & PGlite E2E Suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read

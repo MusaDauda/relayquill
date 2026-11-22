@@ -1,0 +1,29 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ]
+  },
+  "references": [
+    {
+      "path": "../domain"
+    },
+    {
+      "path": "../contracts"
+    },
+    {
+      "path": "../runtime"
+    },
+    {
+      "path": "../postgres"
+    }
+  ],
+  "include": [
+    "src/**/*.ts"
+  ]
+}

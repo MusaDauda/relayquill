@@ -26,6 +26,7 @@
     "@relayquill/runtime": "0.1.0",
     "@relayquill/application": "0.1.0",
     "@relayquill/postgres": "0.1.0",
+    "@relayquill/billing": "0.1.0",
     "@relayquill/broker": "0.1.0"
   }
 }

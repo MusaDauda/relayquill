@@ -22,3 +22,4 @@ export * from "./config.js";
 export * from "./deadlines.js";
 export * from "./lifecycle.js";
 export * from "./telemetry.js";
+export * from "./error-reporting.js";

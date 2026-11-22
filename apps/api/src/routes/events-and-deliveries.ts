@@ -4,6 +4,7 @@ import {
   extractBearerTokenFromAuthorizationHeader,
   hasActiveProjectDataGrant
 } from "@relayquill/auth";
+import { evaluateQuotaGuard } from "@relayquill/billing";
 import {
   computeBusinessKeySha256,
   computeRequestKeySha256,
@@ -31,6 +32,7 @@ import {
   parseDeliveryId,
   parseEventId,
   parseInt64BigInt,
+  parsePrincipalId,
   parseProducerNamespace,
   parseProjectId,
   parseTenantId,
@@ -476,6 +478,69 @@ export function registerEventsAndDeliveriesRoutes(app: FastifyInstance, ctx: Api
           throw new NotFoundDomainError({
             code: "NOT_FOUND",
             message: `Event type ${parsedReq.event_type_id} not found`
+          });
+        }
+
+        if (ctx.enableQuotaGuard) {
+          let actorPrincipalId: PrincipalId;
+          if (resolved.actor.kind === "human_workflow") {
+            actorPrincipalId = parsePrincipalId(resolved.actor.actorPrincipalId, "actor_principal_id");
+          } else {
+            const inst = await ctx.pgAdapter.withTransaction(
+              ctx.pgAdapter.configuredRole,
+              (tx) => readInstallationSnapshot(ctx, tx),
+              { readOnly: true }
+            );
+            const authRes = await authenticateProducerCredential({
+              installation: inst,
+              bearerToken: resolved.actor.bearerToken,
+              repo: ctx.authRepos.producerCredentials,
+              now: ctx.clock.nowInstant()
+            });
+            if (
+              authRes.producer.tenantId !== tenantId ||
+              authRes.producer.projectId !== projectId
+            ) {
+              throw new AuthorizationDomainError({
+                code: "FORBIDDEN",
+                message: "Producer credential belongs to a different project"
+              });
+            }
+            actorPrincipalId = authRes.principal.principalId;
+          }
+
+          const keyHashBuf = Buffer.from(
+            computeRequestKeySha256(resolved.idempotencyKey),
+            "hex"
+          );
+          const isIdempotentReplay = await ctx.pgAdapter.withTransaction(
+            ctx.pgAdapter.configuredRole,
+            async (tx) => {
+              const dup = await tx.query<{ id: string }>(
+                `SELECT id
+                   FROM rq.command_receipts
+                  WHERE tenant_id = $1::uuid
+                    AND project_id = $2::uuid
+                    AND actor_principal_id = $3::uuid
+                    AND command_family = 'events.admit'
+                    AND key_sha256 = $4::bytea
+                  LIMIT 1`,
+                [tenantId, projectId, actorPrincipalId, keyHashBuf]
+              );
+              return dup.rows[0] !== undefined;
+            },
+            { readOnly: true }
+          );
+
+          await evaluateQuotaGuard({
+            pgAdapter: ctx.pgAdapter,
+            redis: ctx.quotaRedis,
+            orgId: tenantId,
+            idempotencyKey: resolved.idempotencyKey,
+            metricCode: "outbound_deliveries",
+            requestedUnits: 1,
+            isIdempotentReplay,
+            now: new Date(ctx.clock.nowInstant().epochMilliseconds)
           });
         }
 

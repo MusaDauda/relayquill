@@ -74,6 +74,11 @@ export function createApiServer(options: CreateApiServerOptions): ApiServerHandl
     cursorSigningKey: options.cursorSigningKey,
     totpReplayStore: options.totpReplayStore,
     totpEncryptionKey: options.totpEncryptionKey,
+    quotaRedis: options.quotaRedis,
+    billingAdapters: options.billingAdapters,
+    emailAdapter: options.emailAdapter,
+    errorReporter: options.errorReporter,
+    enableQuotaGuard: options.enableQuotaGuard,
     logger
   });
 
@@ -111,7 +116,7 @@ export function createApiServer(options: CreateApiServerOptions): ApiServerHandl
       app.server.closeIdleConnections?.();
       const closePromise = app.close();
       app.server.closeAllConnections?.();
-      await closePromise;
+      await Promise.allSettled([closePromise, ctx.quotaRedis.close()]);
     }
   };
 }

@@ -24,6 +24,7 @@
   "dependencies": {
     "@relayquill/application": "0.1.0",
     "@relayquill/auth": "0.1.0",
+    "@relayquill/billing": "0.1.0",
     "@relayquill/contracts": "0.1.0",
     "@relayquill/domain": "0.1.0",
     "@relayquill/event-schema": "0.1.0",

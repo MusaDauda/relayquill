@@ -33,6 +33,7 @@ const ALL_EXAMPLES = [
 
 const PRIVATE_SERVER_LIBS = [
   "@relayquill/postgres",
+  "@relayquill/billing",
   "@relayquill/application",
   "@relayquill/auth",
   "@relayquill/egress",
@@ -111,6 +112,22 @@ export const WORKSPACE_POLICIES = Object.freeze({
     forbidAllNodeBuiltins: false,
     forbiddenPackages: [...HTTP_SERVER_LIBS, ...BROKER_LIBS, ...UI_LIBS, "@simplewebauthn/*"]
   },
+  "@relayquill/billing": {
+    allowedInternal: [
+      "@relayquill/domain",
+      "@relayquill/contracts",
+      "@relayquill/runtime",
+      "@relayquill/postgres"
+    ],
+    forbidAllNodeBuiltins: false,
+    forbiddenPackages: [
+      ...HTTP_SERVER_LIBS,
+      ...DB_LIBS,
+      ...BROKER_LIBS,
+      ...UI_LIBS,
+      "@simplewebauthn/*"
+    ]
+  },
   "@relayquill/producer-sdk": {
     allowedInternal: ["@relayquill/domain", "@relayquill/contracts"],
     forbidAllNodeBuiltins: true,
@@ -161,6 +178,7 @@ export const WORKSPACE_POLICIES = Object.freeze({
       "@relayquill/auth",
       "@relayquill/application",
       "@relayquill/postgres",
+      "@relayquill/billing",
       "@relayquill/event-schema",
       "@relayquill/signing"
     ],
@@ -245,6 +263,7 @@ export const WORKSPACE_POLICIES = Object.freeze({
       "@relayquill/runtime",
       "@relayquill/application",
       "@relayquill/postgres",
+      "@relayquill/billing",
       "@relayquill/broker"
     ],
     forbidAllNodeBuiltins: false,

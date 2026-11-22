@@ -26,6 +26,9 @@
       "path": "../../packages/postgres"
     },
     {
+      "path": "../../packages/billing"
+    },
+    {
       "path": "../../packages/broker"
     }
   ],

@@ -78,10 +78,25 @@ import {
 } from "@relayquill/postgres";
 import {
   type AuthConfig,
+  type ErrorReporter,
   type ProfileKind,
   type SecretProvider,
+  createEnvGatedErrorReporter,
   createSecretProvider
 } from "@relayquill/runtime";
+import {
+  InMemoryQuotaRedisClient,
+  type BillingProviderAdapter,
+  type BillingProviderId,
+  type QuotaRedisClient,
+  TcpRespQuotaRedisClient,
+  type TransactionalEmailAdapter,
+  createPaystackBillingAdapter,
+  createPinnedStripeClient,
+  createStripeBillingAdapter,
+  createTapBillingAdapter,
+  selectTransactionalEmailAdapterFromEnv
+} from "@relayquill/billing";
 import { type FastifyBaseLogger, type FastifyRequest } from "fastify";
 import {
   HttpStatusDomainError,
@@ -125,6 +140,11 @@ export interface ApiContext {
   readonly cursorSigningKey?: Uint8Array | undefined;
   readonly totpReplayStore: TotpReplayGuardStore;
   readonly totpEncryptionKey: Uint8Array;
+  readonly quotaRedis: QuotaRedisClient;
+  readonly billingAdapters: Readonly<Partial<Record<BillingProviderId, BillingProviderAdapter>>>;
+  readonly emailAdapter: TransactionalEmailAdapter;
+  readonly errorReporter: ErrorReporter;
+  readonly enableQuotaGuard: boolean;
   readonly logger: FastifyBaseLogger;
 }
 
@@ -144,7 +164,40 @@ export interface CreateApiContextOptions {
   readonly cursorSigningKey?: Uint8Array | undefined;
   readonly totpReplayStore?: TotpReplayGuardStore | undefined;
   readonly totpEncryptionKey?: Uint8Array | undefined;
+  readonly quotaRedis?: QuotaRedisClient | undefined;
+  readonly billingAdapters?: Readonly<Partial<Record<BillingProviderId, BillingProviderAdapter>>> | undefined;
+  readonly emailAdapter?: TransactionalEmailAdapter | undefined;
+  readonly errorReporter?: ErrorReporter | undefined;
+  readonly enableQuotaGuard?: boolean | undefined;
   readonly logger: FastifyBaseLogger;
+}
+
+function createDefaultBillingAdaptersFromEnv(): Readonly<
+  Partial<Record<BillingProviderId, BillingProviderAdapter>>
+> {
+  const out: Partial<Record<BillingProviderId, BillingProviderAdapter>> = {};
+  const stripeKey =
+    process.env["STRIPE_RESTRICTED_KEY"]?.trim() ?? process.env["STRIPE_API_KEY"]?.trim() ?? "";
+  const stripeWebhookSecret = process.env["STRIPE_WEBHOOK_SECRET"]?.trim() ?? "";
+  if (stripeKey.length > 0 && stripeWebhookSecret.length > 0) {
+    const client = createPinnedStripeClient({
+      apiKey: stripeKey,
+      ...(process.env["STRIPE_API_HOST"] ? { host: process.env["STRIPE_API_HOST"] } : {}),
+      ...(process.env["STRIPE_API_PORT"]
+        ? { port: Number(process.env["STRIPE_API_PORT"]) }
+        : {})
+    });
+    out.stripe = createStripeBillingAdapter({ client, webhookSecret: stripeWebhookSecret });
+  }
+  const paystackKey = process.env["PAYSTACK_SECRET_KEY"]?.trim() ?? "";
+  if (paystackKey.length > 0) {
+    out.paystack = createPaystackBillingAdapter({ secretKey: paystackKey });
+  }
+  const tapKey = process.env["TAP_SECRET_KEY"]?.trim() ?? "";
+  if (tapKey.length > 0) {
+    out.tap = createTapBillingAdapter({ secretKey: tapKey });
+  }
+  return Object.freeze(out);
 }
 
 export function createApiContext(options: CreateApiContextOptions): ApiContext {
@@ -249,6 +302,21 @@ export function createApiContext(options: CreateApiContextOptions): ApiContext {
   const totpEncryptionKey =
     options.totpEncryptionKey ??
     crypto.createHash("sha256").update("relayquill-local-totp-envelope-v1", "utf8").digest();
+  const redisUrl = process.env["REDIS_URL"]?.trim();
+  const quotaRedis =
+    options.quotaRedis ??
+    (redisUrl !== undefined && redisUrl.length > 0
+      ? new TcpRespQuotaRedisClient(redisUrl)
+      : new InMemoryQuotaRedisClient());
+  const billingAdapters = options.billingAdapters ?? createDefaultBillingAdaptersFromEnv();
+  const emailAdapter = options.emailAdapter ?? selectTransactionalEmailAdapterFromEnv();
+  const errorReporter =
+    options.errorReporter ??
+    createEnvGatedErrorReporter({
+      service: "api",
+      dsn: process.env["SENTRY_DSN"]
+    });
+  const enableQuotaGuard = options.enableQuotaGuard ?? true;
 
   return {
     pgAdapter,
@@ -273,6 +341,11 @@ export function createApiContext(options: CreateApiContextOptions): ApiContext {
     cursorSigningKey: options.cursorSigningKey,
     totpReplayStore,
     totpEncryptionKey,
+    quotaRedis,
+    billingAdapters,
+    emailAdapter,
+    errorReporter,
+    enableQuotaGuard,
     logger: options.logger
   };
 }

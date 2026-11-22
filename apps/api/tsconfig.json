@@ -29,6 +29,9 @@
       "path": "../../packages/postgres"
     },
     {
+      "path": "../../packages/billing"
+    },
+    {
       "path": "../../packages/event-schema"
     },
     {

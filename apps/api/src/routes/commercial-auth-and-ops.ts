@@ -273,7 +273,7 @@ async function mintCommercialHumanSession(
   }
 }
 
-async function resolveActorCommercialTenantId(
+export async function resolveActorCommercialTenantId(
   tx: PgTransactionClient,
   principalId: PrincipalId,
   requestedTenantId?: unknown

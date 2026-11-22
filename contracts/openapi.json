@@ -21613,6 +21613,275 @@
           }
         }
       }
+    },
+    "/api/v1/billing/subscription": {
+      "get": {
+        "tags": [
+          "Governance & Audit"
+        ],
+        "operationId": "get_billing_subscription",
+        "summary": "GET /api/v1/billing/subscription",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful envelope response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericMutationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/usage": {
+      "get": {
+        "tags": [
+          "Governance & Audit"
+        ],
+        "operationId": "get_billing_usage",
+        "summary": "GET /api/v1/billing/usage",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful envelope response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericMutationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/checkout": {
+      "post": {
+        "tags": [
+          "Governance & Audit"
+        ],
+        "operationId": "post_billing_checkout",
+        "summary": "POST /api/v1/billing/checkout",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": [],
+            "idempotencyKey": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Regional checkout session created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericMutationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Billing provider not configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/portal": {
+      "post": {
+        "tags": [
+          "Governance & Audit"
+        ],
+        "operationId": "post_billing_portal",
+        "summary": "POST /api/v1/billing/portal",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": [],
+            "idempotencyKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portal session returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericMutationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/cancel": {
+      "post": {
+        "tags": [
+          "Governance & Audit"
+        ],
+        "operationId": "post_billing_cancel",
+        "summary": "POST /api/v1/billing/cancel",
+        "security": [
+          {
+            "sessionCookie": [],
+            "csrfHeader": [],
+            "idempotencyKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscription cancellation scheduled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericMutationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/stripe": {
+      "post": {
+        "tags": [
+          "Governance & Audit"
+        ],
+        "operationId": "post_webhooks_stripe",
+        "summary": "POST /api/v1/webhooks/stripe",
+        "responses": {
+          "200": {
+            "description": "Stripe webhook processed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericMutationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid webhook signature.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/paystack": {
+      "post": {
+        "tags": [
+          "Governance & Audit"
+        ],
+        "operationId": "post_webhooks_paystack",
+        "summary": "POST /api/v1/webhooks/paystack",
+        "responses": {
+          "200": {
+            "description": "Paystack webhook processed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericMutationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid webhook signature.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/tap": {
+      "post": {
+        "tags": [
+          "Governance & Audit"
+        ],
+        "operationId": "post_webhooks_tap",
+        "summary": "POST /api/v1/webhooks/tap",
+        "responses": {
+          "200": {
+            "description": "Tap MENA webhook processed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenericMutationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid webhook signature.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

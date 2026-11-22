@@ -211,6 +211,8 @@ export function mapDomainErrorCodeToHttpStatus(code: DomainErrorCode): number {
     case "UNAUTHENTICATED":
     case "SIGNATURE_VERIFICATION_FAILED":
       return 401;
+    case "QUOTA_HARD_CAP_REACHED":
+      return 402;
     case "FORBIDDEN":
     case "EGRESS_POLICY_DENIED":
       return 403;

@@ -25,3 +25,13 @@ export {
   runCoordinatorCli,
   type CoordinatorCliOptions
 } from "./main.js";
+export {
+  runBillingGraceExpirySweep,
+  runEmailOutboxSweep,
+  runGdprErasureCompletionSweep,
+  type BillingGraceSweepOptions,
+  type BillingGraceSweepSummary,
+  type EmailOutboxSweepOptions,
+  type GdprErasureSweepOptions,
+  type GdprErasureSweepSummary
+} from "./commercial-sweeps.js";

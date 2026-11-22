@@ -1,5 +1,5 @@
-import { LimitExceededDomainError, NotFoundDomainError } from "@relayquill/domain";
-import Fastify, { LogController, type FastifyInstance } from "fastify";
+import { LimitExceededDomainError, NotFoundDomainError, ValidationDomainError } from "@relayquill/domain";
+import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 import { type ApiContext } from "./context.js";
 import { mapUnknownErrorToHttpResponse } from "./http/errors.js";
 import { assertJsonMediaTypeHeader, assertStrictRawHeaders } from "./http/headers.js";
@@ -7,6 +7,7 @@ import {
   DEFAULT_API_BODY_LIMIT_BYTES,
   parseStrictHttpJsonBuffer
 } from "./http/json-parser.js";
+import { registerBillingRoutes } from "./routes/billing.js";
 import { registerEventsAndDeliveriesRoutes } from "./routes/events-and-deliveries.js";
 import { registerGovernanceAndStreamsRoutes } from "./routes/governance-and-streams.js";
 import { registerHealthAndAccessRoutes } from "./routes/health-and-access.js";
@@ -19,8 +20,19 @@ import {
 const EMPTY_BODY_OPTIONAL_PATHS = new Set([
   "/api/v1/session/logout",
   "/api/v1/session/csrf",
-  "/api/v1/auth/logout"
+  "/api/v1/auth/logout",
+  "/api/v1/billing/portal",
+  "/api/v1/billing/cancel"
 ]);
+
+const rawBodyByRequest = new WeakMap<object, Buffer>();
+
+/**
+ * Retrieves the exact unmodified HTTP JSON body bytes captured before Fastify parsing (for webhook HMAC checks).
+ */
+export function getRequestRawBodyBuffer(request: FastifyRequest): Buffer | undefined {
+  return rawBodyByRequest.get(request);
+}
 
 export function createApiFastifyServer(ctx: ApiContext): FastifyInstance {
   const app = Fastify({
@@ -57,6 +69,26 @@ export function createApiFastifyServer(ctx: ApiContext): FastifyInstance {
         }
 
         const routeUrl = request.url.split("?")[0] ?? request.url;
+        rawBodyByRequest.set(request, rawBuf);
+        if (routeUrl.startsWith("/api/v1/webhooks/")) {
+          let vendorParsed: unknown;
+          try {
+            vendorParsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(rawBuf));
+          } catch {
+            throw new ValidationDomainError({
+              code: "INVALID_VALUE",
+              message: "Webhook payload must be valid UTF-8 JSON"
+            });
+          }
+          if (vendorParsed === null || typeof vendorParsed !== "object" || Array.isArray(vendorParsed)) {
+            throw new ValidationDomainError({
+              code: "INVALID_VALUE",
+              message: "Webhook payload must be a JSON object"
+            });
+          }
+          done(null, vendorParsed);
+          return;
+        }
         const allowEmpty =
           rawBuf.byteLength === 0 && EMPTY_BODY_OPTIONAL_PATHS.has(routeUrl);
         const parsed = parseStrictHttpJsonBuffer(rawBuf, { allowEmpty });
@@ -115,6 +147,13 @@ export function createApiFastifyServer(ctx: ApiContext): FastifyInstance {
   app.setErrorHandler((err, request, reply) => {
     const mapped = mapUnknownErrorToHttpResponse(err, { requestId: request.id });
     if (mapped.statusCode >= 500) {
+      void ctx.errorReporter.captureException(err, {
+        service: "api",
+        route: request.routeOptions.url ?? request.url.split("?")[0],
+        method: request.method,
+        statusCode: mapped.statusCode,
+        requestId: request.id
+      });
       ctx.logger.error(
         {
           request_id: request.id,
@@ -146,6 +185,7 @@ export function createApiFastifyServer(ctx: ApiContext): FastifyInstance {
 
   registerHealthAndAccessRoutes(app, ctx);
   registerCommercialAuthAndOpsRoutes(app, ctx);
+  registerBillingRoutes(app, ctx);
   registerPlatformAndProjectRoutes(app, ctx);
   registerEventsAndDeliveriesRoutes(app, ctx);
   registerGovernanceAndStreamsRoutes(app, ctx);

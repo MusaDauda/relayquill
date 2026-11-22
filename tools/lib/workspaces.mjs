@@ -16,6 +16,7 @@ export const REVIEWED_WORKSPACE_ORDER = Object.freeze([
   "@relayquill/auth",
   "@relayquill/application",
   "@relayquill/postgres",
+  "@relayquill/billing",
   // Tier 2: Public SDKs
   "@relayquill/producer-sdk",
   "@relayquill/receiver-sdk",

@@ -338,10 +338,15 @@ test("Provider ingress verifies Stripe/Paystack webhooks, enforces dedup/conflic
     retry: { maxAttempts: 1 }
   });
 
+  let ipcTempDir = null;
   const ipcEndpoint =
     process.platform === "win32"
       ? `\\\\.\\pipe\\rq-pi-test-${crypto.randomBytes(6).toString("hex")}`
-      : path.join(os.tmpdir(), `rq-pi-test-${crypto.randomBytes(6).toString("hex")}.sock`);
+      : (() => {
+          ipcTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "rq-pi-"));
+          fs.chmodSync(ipcTempDir, 0o700);
+          return path.join(ipcTempDir, "control.sock");
+        })();
 
   const server = await createProviderIngressServer({
     db,
@@ -497,6 +502,9 @@ test("Provider ingress verifies Stripe/Paystack webhooks, enforces dedup/conflic
     await apiDouble.close();
     await secretProvider.close();
     await db.close();
+    if (ipcTempDir !== null) {
+      fs.rmSync(ipcTempDir, { recursive: true, force: true });
+    }
   }
 });
 

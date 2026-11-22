@@ -1,16 +1,20 @@
 import { type JSX, useEffect, useRef, useState } from "react";
 import { AccessPage } from "../features/access/AccessPage.js";
 import { AuditPage } from "../features/audit/AuditPage.js";
+import { BillingPage } from "../features/billing/BillingPage.js";
 import { DeliveriesPage } from "../features/deliveries/DeliveriesPage.js";
 import { EndpointsPage } from "../features/endpoints/EndpointsPage.js";
 import { EventsPage } from "../features/events/EventsPage.js";
 import { LimitsPage } from "../features/limits/LimitsPage.js";
+import { OnboardingPage } from "../features/onboarding/OnboardingPage.js";
 import { OrderingPage } from "../features/ordering/OrderingPage.js";
 import { PlatformPage } from "../features/platform/PlatformPage.js";
 import { OverviewPage } from "../features/projects/OverviewPage.js";
 import { ReplaysPage } from "../features/replays/ReplaysPage.js";
 import { SchemasPage } from "../features/schemas/SchemasPage.js";
+import { SettingsAuditPage } from "../features/settings/SettingsAuditPage.js";
 import { SigningPage } from "../features/signing/SigningPage.js";
+import { StatusPage } from "../features/status/StatusPage.js";
 import { SubscriptionsPage } from "../features/subscriptions/SubscriptionsPage.js";
 import { ConsoleIcon } from "../components/Icons.js";
 import { ResourceStatePanel } from "../components/ResourceStatePanel.js";
@@ -22,8 +26,12 @@ import {
   type ProjectSection,
   ConsoleRouterProvider,
   buildAccessPath,
+  buildBillingPath,
+  buildOnboardingPath,
   buildPlatformPath,
   buildProjectPath,
+  buildSettingsAuditPath,
+  buildStatusPath,
   useConsoleRouter
 } from "./router.js";
 import { ConsoleScopeProvider } from "./scope.js";
@@ -86,6 +94,10 @@ function ConsoleShell(): JSX.Element {
     route.kind === "project" ? route.projectId : (activeWorkspace?.project_id ?? null);
 
   const renderMainContent = (): JSX.Element => {
+    if (route.kind === "status") {
+      return <StatusPage />;
+    }
+
     if (sessionState.status === "loading") {
       return (
         <ResourceStatePanel view={{ state: "loading" }} resourceLabel="Operator session">
@@ -146,11 +158,26 @@ function ConsoleShell(): JSX.Element {
       return <AccessPage section="sign-in" />;
     }
 
+    if (route.kind === "onboarding") {
+      return <OnboardingPage />;
+    }
+
+    if (route.kind === "billing") {
+      return <BillingPage />;
+    }
+
+    if (route.kind === "settings_audit") {
+      return <SettingsAuditPage />;
+    }
+
     if (route.kind === "root") {
       if (activeWorkspace !== null) {
         return <OverviewPage />;
       }
-      return <PlatformPage section="tenants" />;
+      if (session.platform_roles.length > 0) {
+        return <PlatformPage section="tenants" />;
+      }
+      return <OnboardingPage />;
     }
 
     if (route.kind === "platform") {
@@ -270,7 +297,69 @@ function ConsoleShell(): JSX.Element {
             ) : null}
 
             <div>
-              <h3 className="rq-nav-group-title">Access & Passkeys</h3>
+              <h3 className="rq-nav-group-title">Commercial &amp; Account</h3>
+              <ul className="rq-nav-list">
+                {session !== null ? (
+                  <>
+                    <li>
+                      <a
+                        href={buildOnboardingPath()}
+                        className="rq-nav-link"
+                        aria-current={route.kind === "onboarding" ? "page" : undefined}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate(buildOnboardingPath());
+                        }}
+                      >
+                        <span>Onboarding</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        href={buildBillingPath()}
+                        className="rq-nav-link"
+                        aria-current={route.kind === "billing" ? "page" : undefined}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate(buildBillingPath());
+                        }}
+                      >
+                        <span>Billing &amp; Usage</span>
+                      </a>
+                    </li>
+                    <li>
+                      <a
+                        href={buildSettingsAuditPath()}
+                        className="rq-nav-link"
+                        aria-current={route.kind === "settings_audit" ? "page" : undefined}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate(buildSettingsAuditPath());
+                        }}
+                      >
+                        <span>Audit &amp; Privacy</span>
+                      </a>
+                    </li>
+                  </>
+                ) : null}
+                <li>
+                  <a
+                    href={buildStatusPath()}
+                    className="rq-nav-link"
+                    aria-current={route.kind === "status" ? "page" : undefined}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate(buildStatusPath());
+                    }}
+                  >
+                    <span>System Status</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="rq-nav-group-title">Access &amp; Passkeys</h3>
               <ul className="rq-nav-list">
                 <li>
                   <a

@@ -18,6 +18,7 @@ import { InMemorySecretProvider, sendIpcFrame } from "@relayquill/runtime";
 import {
   createProviderIngressDbClient,
   createProviderIngressServer,
+  generateGithubPushWebhookFixture,
   generatePaystackWebhookFixture,
   generateStripeWebhookFixture,
   parseProviderIngressCliArgs,
@@ -527,4 +528,136 @@ test("parseProviderIngressCliArgs parses config and rejects invalid flags", () =
 
   assert.throws(() => parseProviderIngressCliArgs(["--unknown"], {}), /Unknown CLI argument/);
   assert.throws(() => parseProviderIngressCliArgs([], {}), /Missing required --config/);
+});
+
+test("Provider ingress verifies GitHub github.push.v1 webhooks, rejects malformed signatures, enforces semantic dedup, and forwards", async () => {
+  const { pglite, db } = await createMigratedPiDb();
+  const tenantId = crypto.randomUUID();
+  const projectId = crypto.randomUUID();
+  const channelId = crypto.randomUUID();
+  const eventTypeId = crypto.randomUUID();
+  const githubBindingId = crypto.randomUUID();
+  const githubSecret = "whsec_test_relayquill_github_push_secret";
+
+  const secretProvider = new InMemorySecretProvider({
+    initialSecrets: {
+      "custody:github/test": githubSecret
+    }
+  });
+
+  const apiDouble = await startAdmissionApiDouble({
+    tenantId,
+    projectId,
+    namespace: "github.webhooks"
+  });
+
+  const producerToken = `rq_p1.${crypto.randomUUID()}.${crypto.randomBytes(32).toString("base64url")}`;
+  const producerClient = createProducerClient({
+    baseUrl: apiDouble.baseUrl,
+    getCredential: () => producerToken,
+    retry: { maxAttempts: 1 }
+  });
+
+  const server = await createProviderIngressServer({
+    db,
+    host: "127.0.0.1",
+    port: 0,
+    secretProvider,
+    producerClient,
+    startForwarder: false
+  });
+
+  try {
+    await seedAndActivateBinding(pglite, db, {
+      bindingId: githubBindingId,
+      provider: "github",
+      accountReference: "relayquill/webhooks",
+      accountMode: "test",
+      payloadProfile: "github.push.v1",
+      secretCustodyReference: "custody:github/test",
+      secretVersionReference: "v1",
+      tenantId,
+      projectId,
+      publicationChannelId: channelId,
+      eventTypeId,
+      schemaVersion: 1
+    });
+
+    const started = await server.start();
+    const baseUrl = `http://${started.host}:${started.port}`;
+
+    // 1. Accepted GitHub push webhook -> 202
+    const deliveryId = crypto.randomUUID();
+    const acceptedFixture = generateGithubPushWebhookFixture({
+      secret: githubSecret,
+      deliveryId,
+      afterSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    });
+    const res1 = await fetch(`${baseUrl}/webhooks/github`, {
+      method: "POST",
+      headers: acceptedFixture.headers,
+      body: new Uint8Array(acceptedFixture.payloadBytes)
+    });
+    assert.equal(res1.status, 202);
+    const body1 = await res1.json();
+    assert.equal(body1.outcome, "accepted");
+
+    // 2. Semantic dedup with reordered JSON + same deliveryId -> 200 already_accepted_semantic
+    const dedupFixture = generateGithubPushWebhookFixture({
+      secret: githubSecret,
+      deliveryId,
+      afterSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      reorderKeys: true
+    });
+    const res2 = await fetch(`${baseUrl}/webhooks/github`, {
+      method: "POST",
+      headers: dedupFixture.headers,
+      body: new Uint8Array(dedupFixture.payloadBytes)
+    });
+    assert.equal(res2.status, 200);
+    const body2 = await res2.json();
+    assert.equal(body2.outcome, "already_accepted_semantic");
+
+    // 3. Semantic conflict (same deliveryId, altered afterSha) -> 409
+    const conflictFixture = generateGithubPushWebhookFixture({
+      secret: githubSecret,
+      deliveryId,
+      afterSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    });
+    const resConflict = await fetch(`${baseUrl}/webhooks/github`, {
+      method: "POST",
+      headers: conflictFixture.headers,
+      body: new Uint8Array(conflictFixture.payloadBytes)
+    });
+    assert.equal(resConflict.status, 409);
+
+    // 4. Reject uppercase or missing sha256= prefix -> 401
+    const upperSigRes = await fetch(`${baseUrl}/webhooks/github`, {
+      method: "POST",
+      headers: {
+        ...acceptedFixture.headers,
+        "x-hub-signature-256": acceptedFixture.headers["x-hub-signature-256"].toUpperCase()
+      },
+      body: new Uint8Array(acceptedFixture.payloadBytes)
+    });
+    assert.equal(upperSigRes.status, 401);
+
+    // 5. Forward stored observation into admission API
+    const cycle = await server.forwarder.runOnce();
+    assert.equal(cycle.dueCount, 1);
+    assert.equal(cycle.acceptedCount, 1);
+    assert.equal(apiDouble.getMetrics().admittedCount, 1);
+
+    const obs = await pglite.query(
+      `SELECT provider, payload_profile, state FROM pi.observations`
+    );
+    assert.deepEqual(obs.rows, [
+      { provider: "github", payload_profile: "github.push.v1", state: "forwarded" }
+    ]);
+  } finally {
+    await server.stop();
+    await apiDouble.close();
+    await secretProvider.close();
+    await db.close();
+  }
 });

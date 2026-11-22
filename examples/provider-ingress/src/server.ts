@@ -31,8 +31,10 @@ import {
 } from "./forwarder.js";
 import {
   ProviderVerificationError,
+  normalizeGithubPushCallback,
   normalizePaystackCallback,
   normalizeStripeCallback,
+  verifyGithubWebhookCallback,
   verifyPaystackWebhookCallback,
   verifyStripeWebhookCallback,
   type NormalizedProviderCallback
@@ -45,6 +47,7 @@ export interface ProviderIngressServerOptions {
   readonly port?: number | undefined;
   readonly stripePath?: string | undefined;
   readonly paystackPath?: string | undefined;
+  readonly githubPath?: string | undefined;
   readonly bodyLimitBytes?: number | undefined;
   readonly secretProvider?: SecretProvider | undefined;
   readonly resolveWebhookSecret?: ((binding: ProviderBindingRecord) => Promise<string> | string) | undefined;
@@ -219,6 +222,7 @@ export async function createProviderIngressServer(
   const port = options.port ?? 19096;
   const stripePath = options.stripePath ?? "/webhooks/stripe";
   const paystackPath = options.paystackPath ?? "/webhooks/paystack";
+  const githubPath = options.githubPath ?? "/webhooks/github";
   const bodyLimitBytes = options.bodyLimitBytes ?? 262_144;
   const toleranceSeconds = options.toleranceSeconds ?? 300;
   const forwardOnIngress = options.forwardOnIngress ?? false;
@@ -316,7 +320,7 @@ export async function createProviderIngressServer(
               event: stripeEvent,
               rawBodyBytes
             });
-          } else {
+          } else if (provider === "paystack") {
             const paystackSig = readSingleHeader(request, "x-paystack-signature");
             const paystackPayload = verifyPaystackWebhookCallback({
               rawBodyBytes,
@@ -327,6 +331,22 @@ export async function createProviderIngressServer(
               binding: candidate,
               payload: paystackPayload,
               rawBodyBytes
+            });
+          } else {
+            const githubSig = readSingleHeader(request, "x-hub-signature-256");
+            const githubDelivery = readSingleHeader(request, "x-github-delivery");
+            const githubEvent = readSingleHeader(request, "x-github-event");
+            const githubPayload = verifyGithubWebhookCallback({
+              rawBodyBytes,
+              signatureHeader: githubSig,
+              webhookSecret
+            });
+            normalized = normalizeGithubPushCallback({
+              binding: candidate,
+              payload: githubPayload,
+              rawBodyBytes,
+              deliveryId: githubDelivery,
+              eventHeader: githubEvent
             });
           }
           matchedBinding = candidate;
@@ -418,6 +438,7 @@ export async function createProviderIngressServer(
 
   app.post(stripePath, async (request, reply) => handleIngressCallback("stripe", request, reply));
   app.post(paystackPath, async (request, reply) => handleIngressCallback("paystack", request, reply));
+  app.post(githubPath, async (request, reply) => handleIngressCallback("github", request, reply));
 
   let ipcHandle: IpcServerHandle | undefined;
   let boundAddress: { readonly host: string; readonly port: number } | undefined;

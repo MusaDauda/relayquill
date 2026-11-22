@@ -7,7 +7,7 @@ import {
 } from "@relayquill/domain";
 import { parseCanonicalUtcTimestamp } from "@relayquill/contracts";
 
-export type ProviderKind = "stripe" | "paystack";
+export type ProviderKind = "stripe" | "paystack" | "github";
 export type AccountMode = "test" | "live";
 
 export interface ProviderIngressQueryResult<
@@ -432,7 +432,10 @@ export async function createProviderIngressDbClient(
 function mapBindingRow(row: Record<string, unknown>): ProviderBindingRecord {
   const provider = readReqString(row, "provider");
   const mode = readReqString(row, "account_mode");
-  if ((provider !== "stripe" && provider !== "paystack") || (mode !== "test" && mode !== "live")) {
+  if (
+    (provider !== "stripe" && provider !== "paystack" && provider !== "github") ||
+    (mode !== "test" && mode !== "live")
+  ) {
     throw new ProviderIngressDbError({
       code: "INTERNAL_ERROR",
       httpStatus: 500,

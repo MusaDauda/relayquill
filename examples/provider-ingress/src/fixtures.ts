@@ -4,7 +4,7 @@ import Stripe from "stripe";
 const stripeFixtureClient = new Stripe("rk_test_provider_ingress_fixture_only");
 
 export interface GeneratedWebhookFixture {
-  readonly provider: "stripe" | "paystack";
+  readonly provider: "stripe" | "paystack" | "github";
   readonly eventId: string;
   readonly payloadText: string;
   readonly payloadBytes: Buffer;
@@ -138,6 +138,72 @@ export function generatePaystackWebhookFixture(params: {
   };
 }
 
+export function generateGithubPushWebhookFixture(params: {
+  readonly secret: string;
+  readonly deliveryId?: string | undefined;
+  readonly repository?: string | undefined;
+  readonly ref?: string | undefined;
+  readonly beforeSha?: string | undefined;
+  readonly afterSha?: string | undefined;
+  readonly commitId?: string | undefined;
+  readonly timestamp?: string | undefined;
+  readonly reorderKeys?: boolean | undefined;
+}): GeneratedWebhookFixture {
+  const deliveryId = params.deliveryId ?? crypto.randomUUID();
+  const repositoryFullName = params.repository ?? "relayquill/webhooks";
+  const gitRef = params.ref ?? "refs/heads/main";
+  const beforeSha = params.beforeSha ?? "1111111111111111111111111111111111111111";
+  const afterSha = params.afterSha ?? "2222222222222222222222222222222222222222";
+  const commitId = params.commitId ?? afterSha;
+  const timestamp = params.timestamp ?? "2026-06-01T12:00:00Z";
+
+  const headCommit =
+    params.reorderKeys === true
+      ? { timestamp, id: commitId, message: "feat: webhook conformance push" }
+      : { id: commitId, message: "feat: webhook conformance push", timestamp };
+  const repository =
+    params.reorderKeys === true
+      ? { id: 987654, full_name: repositoryFullName }
+      : { full_name: repositoryFullName, id: 987654 };
+  const payloadObj =
+    params.reorderKeys === true
+      ? {
+          head_commit: headCommit,
+          commits: [headCommit],
+          after: afterSha,
+          before: beforeSha,
+          ref: gitRef,
+          repository
+        }
+      : {
+          ref: gitRef,
+          before: beforeSha,
+          after: afterSha,
+          repository,
+          head_commit: headCommit,
+          commits: [headCommit]
+        };
+  const payloadText =
+    params.reorderKeys === true
+      ? JSON.stringify(payloadObj, null, 2)
+      : JSON.stringify(payloadObj);
+  const payloadBytes = Buffer.from(payloadText, "utf8");
+  const digest = crypto.createHmac("sha256", params.secret).update(payloadBytes).digest("hex");
+
+  return {
+    provider: "github",
+    eventId: deliveryId,
+    payloadText,
+    payloadBytes,
+    headers: Object.freeze({
+      "content-type": "application/json",
+      "x-github-event": "push",
+      "x-github-delivery": deliveryId,
+      "x-hub-signature-256": `sha256=${digest}`
+    })
+  };
+}
+
 export interface FixtureCheckResult {
   readonly name: string;
   readonly status: number;
@@ -155,14 +221,18 @@ export async function runProviderIngressFixtures(params: {
   readonly baseUrl: string;
   readonly stripePath?: string | undefined;
   readonly paystackPath?: string | undefined;
+  readonly githubPath?: string | undefined;
   readonly stripeSecret: string;
   readonly paystackSecret: string;
+  readonly githubSecret?: string | undefined;
   readonly stripeBindingId?: string | undefined;
   readonly paystackBindingId?: string | undefined;
+  readonly githubBindingId?: string | undefined;
 }): Promise<ProviderIngressFixtureSuiteResult> {
   const baseUrl = params.baseUrl.replace(/\/+$/, "");
   const stripePath = params.stripePath ?? "/webhooks/stripe";
   const paystackPath = params.paystackPath ?? "/webhooks/paystack";
+  const githubPath = params.githubPath ?? "/webhooks/github";
 
   const stripeSuffix =
     params.stripeBindingId !== undefined
@@ -171,6 +241,10 @@ export async function runProviderIngressFixtures(params: {
   const paystackSuffix =
     params.paystackBindingId !== undefined
       ? `?binding_id=${encodeURIComponent(params.paystackBindingId)}`
+      : "";
+  const githubSuffix =
+    params.githubBindingId !== undefined
+      ? `?binding_id=${encodeURIComponent(params.githubBindingId)}`
       : "";
 
   const sendPost = async (
@@ -282,6 +356,37 @@ export async function runProviderIngressFixtures(params: {
     "x-paystack-signature": "a".repeat(128)
   });
   pushCheck("paystack.invalid_signature", pBadSig.status, 401, pBadSig.body);
+
+  if (params.githubSecret !== undefined) {
+    const ghFixture = generateGithubPushWebhookFixture({
+      secret: params.githubSecret
+    });
+    const g1 = await sendPost(`${githubPath}${githubSuffix}`, ghFixture.payloadBytes, ghFixture.headers);
+    pushCheck(
+      "github.accepted",
+      g1.status,
+      202,
+      g1.body,
+      (g1.body as Record<string, unknown> | undefined)?.["outcome"] === "accepted"
+    );
+
+    const g2 = await sendPost(`${githubPath}${githubSuffix}`, ghFixture.payloadBytes, ghFixture.headers);
+    pushCheck(
+      "github.transport_dedup",
+      g2.status,
+      200,
+      g2.body,
+      (g2.body as Record<string, unknown> | undefined)?.["outcome"] === "already_accepted_transport"
+    );
+
+    const gBadSig = await sendPost(`${githubPath}${githubSuffix}`, ghFixture.payloadBytes, {
+      "content-type": "application/json",
+      "x-github-event": "push",
+      "x-github-delivery": ghFixture.eventId,
+      "x-hub-signature-256": `sha256=${"0".repeat(64)}`
+    });
+    pushCheck("github.invalid_signature", gBadSig.status, 401, gBadSig.body);
+  }
 
   return {
     passed: checks.every((c) => c.passed),

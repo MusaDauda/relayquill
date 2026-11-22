@@ -35,6 +35,10 @@ export type ProjectSection =
 export type ConsoleRoute =
   | { readonly kind: "root" }
   | { readonly kind: "access"; readonly section: AccessSection }
+  | { readonly kind: "status" }
+  | { readonly kind: "onboarding" }
+  | { readonly kind: "billing" }
+  | { readonly kind: "settings_audit" }
   | { readonly kind: "platform"; readonly section: PlatformSection }
   | {
       readonly kind: "project";
@@ -73,6 +77,18 @@ export function parseConsolePathname(pathname: string): ConsoleRoute {
   const normalized = pathname.replace(/\/+$/, "") || "/";
   if (normalized === "/") {
     return { kind: "root" };
+  }
+  if (normalized === "/status") {
+    return { kind: "status" };
+  }
+  if (normalized === "/onboarding") {
+    return { kind: "onboarding" };
+  }
+  if (normalized === "/billing") {
+    return { kind: "billing" };
+  }
+  if (normalized === "/settings/audit") {
+    return { kind: "settings_audit" };
   }
 
   const parts = normalized.slice(1).split("/");
@@ -144,6 +160,22 @@ export function buildPlatformPath(section: PlatformSection): string {
 
 export function buildAccessPath(section: AccessSection): string {
   return `/access/${section}`;
+}
+
+export function buildStatusPath(): string {
+  return "/status";
+}
+
+export function buildOnboardingPath(): string {
+  return "/onboarding";
+}
+
+export function buildBillingPath(): string {
+  return "/billing";
+}
+
+export function buildSettingsAuditPath(): string {
+  return "/settings/audit";
 }
 
 interface RouterContextValue {

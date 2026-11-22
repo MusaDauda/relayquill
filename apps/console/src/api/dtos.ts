@@ -675,6 +675,213 @@ export interface GenericMutationResultDto {
   readonly [key: string]: unknown;
 }
 
+export type CommercialPlanTierDto = "free" | "pro" | "team" | "enterprise";
+export type CommercialBillingIntervalDto = "month" | "year";
+export type CommercialBillingProviderDto = "stripe" | "paystack" | "tap";
+
+export interface PublicStatusComponentDto {
+  readonly name: string;
+  readonly status: "operational" | "degraded" | "maintenance";
+  readonly pending_events?: number | undefined;
+  readonly success_rate_24h?: number | undefined;
+}
+
+export interface PublicStatusDto {
+  readonly service: string;
+  readonly overall_status: "operational" | "degraded" | "maintenance";
+  readonly checked_at: CanonicalUtcTimestamp;
+  readonly components: readonly PublicStatusComponentDto[];
+}
+
+export interface CommercialSignupResponseDto {
+  readonly user_id: CanonicalUuid;
+  readonly principal_id: PrincipalId;
+  readonly tenant_id: CanonicalUuid;
+  readonly tenant_slug: string;
+  readonly role: string;
+  readonly plan_tier: CommercialPlanTierDto;
+  readonly mfa_enrolled: boolean;
+  readonly tos_version: string;
+  readonly dpa_version: string;
+  readonly csrf_token: string;
+}
+
+export interface CommercialLoginResponseDto {
+  readonly user_id: CanonicalUuid;
+  readonly principal_id: PrincipalId;
+  readonly tenant_id: CanonicalUuid;
+  readonly role: string;
+  readonly mfa_enrolled: boolean;
+  readonly csrf_token: string;
+}
+
+export interface TotpEnrollResponseDto {
+  readonly otpauth_uri: string;
+  readonly secret_base32: string;
+  readonly enrolled: boolean;
+}
+
+export interface TotpVerifyResponseDto {
+  readonly enrolled: boolean;
+}
+
+export interface LegalAcceptResponseDto {
+  readonly acceptance_id: CanonicalUuid;
+  readonly tenant_id: CanonicalUuid;
+  readonly document_kind: "tos" | "privacy" | "dpa";
+  readonly doc_version: string;
+  readonly accepted_at: CanonicalUtcTimestamp;
+}
+
+export interface BillingRegionalRoutingDto {
+  readonly provider: CommercialBillingProviderDto;
+  readonly countryCode: string;
+  readonly currency: string;
+  readonly regionLabel: string;
+  readonly taxAutomation: boolean;
+}
+
+export interface BillingUsageRollupDto {
+  readonly metric_code: string;
+  readonly total_billable_units: string | number;
+  readonly total_free_units: string | number;
+  readonly total_cogs_micros?: string | number | undefined;
+  readonly alert_70_sent_at?: CanonicalUtcTimestamp | null | undefined;
+  readonly alert_85_sent_at?: CanonicalUtcTimestamp | null | undefined;
+  readonly alert_95_sent_at?: CanonicalUtcTimestamp | null | undefined;
+  readonly spike_alert_sent_at?: CanonicalUtcTimestamp | null | undefined;
+}
+
+export interface BillingUsageEventDto {
+  readonly usage_event_id: CanonicalUuid;
+  readonly idempotency_key: string;
+  readonly metric_code: string;
+  readonly billable_units: string | number;
+  readonly billed_reason: string;
+  readonly currency: string;
+  readonly unit_price_minor: string | number;
+  readonly created_at: CanonicalUtcTimestamp;
+}
+
+export interface BillingSubscriptionViewDto {
+  readonly org_id: CanonicalUuid;
+  readonly period_month: string;
+  readonly customer: Readonly<Record<string, unknown>> | null;
+  readonly subscription: {
+    readonly subscription_id?: CanonicalUuid | undefined;
+    readonly stripe_subscription_id?: string | null | undefined;
+    readonly plan_tier: CommercialPlanTierDto;
+    readonly entitlement_state: string;
+    readonly billing_interval: CommercialBillingIntervalDto;
+    readonly currency: string;
+    readonly unit_amount_minor: number;
+    readonly seat_count: number;
+    readonly current_period_start?: CanonicalUtcTimestamp | undefined;
+    readonly current_period_end?: CanonicalUtcTimestamp | undefined;
+    readonly trial_ends_at?: CanonicalUtcTimestamp | null | undefined;
+    readonly grace_ends_at?: CanonicalUtcTimestamp | null | undefined;
+    readonly cancel_at_period_end: boolean;
+  };
+  readonly quotas: {
+    readonly max_seats: number;
+    readonly max_concurrency: number;
+    readonly included_units_month: number | string;
+    readonly overage_unit_minor: number;
+    readonly cap_mode: "hard_cap" | "soft_cap";
+    readonly retention_days: number;
+    readonly sso_enabled: boolean;
+  };
+  readonly usage_rollups: readonly BillingUsageRollupDto[];
+  readonly regional_routing: BillingRegionalRoutingDto;
+  readonly configured_providers: readonly CommercialBillingProviderDto[];
+}
+
+export interface BillingUsageViewDto {
+  readonly org_id: CanonicalUuid;
+  readonly period_month: string;
+  readonly rollups: readonly BillingUsageRollupDto[];
+  readonly events: readonly BillingUsageEventDto[];
+}
+
+export interface BillingCheckoutResponseDto {
+  readonly org_id: CanonicalUuid;
+  readonly provider: CommercialBillingProviderDto;
+  readonly session_id: string;
+  readonly checkout_url: string;
+  readonly currency: string;
+  readonly amount_minor: number;
+  readonly tax_automation_enabled: boolean;
+  readonly regional_routing: BillingRegionalRoutingDto;
+}
+
+export interface BillingPortalResponseDto {
+  readonly org_id: CanonicalUuid;
+  readonly provider: CommercialBillingProviderDto;
+  readonly hosted_portal: boolean;
+  readonly portal_url: string;
+  readonly self_serve_cancel_endpoint?: string | undefined;
+}
+
+export interface BillingCancelResponseDto {
+  readonly org_id: CanonicalUuid;
+  readonly previous_state: string;
+  readonly entitlement_state: string;
+  readonly cancel_at_period_end: boolean;
+}
+
+export interface CustomerAuditEventDto {
+  readonly audit_id: CanonicalUuid;
+  readonly actor_kind: string;
+  readonly actor_reference: string | null;
+  readonly action: string;
+  readonly target_kind: string;
+  readonly target_id: string;
+  readonly metadata: Readonly<Record<string, unknown>>;
+  readonly occurred_at: CanonicalUtcTimestamp;
+}
+
+export interface BreakGlassSessionSummaryDto {
+  readonly break_glass_id: CanonicalUuid;
+  readonly operator_id: string;
+  readonly reason: string;
+  readonly read_only: boolean;
+  readonly started_at: CanonicalUtcTimestamp;
+  readonly expires_at: CanonicalUtcTimestamp;
+  readonly revoked_at: CanonicalUtcTimestamp | null;
+}
+
+export interface CustomerSettingsAuditDto {
+  readonly tenant_id: CanonicalUuid;
+  readonly audit_events: readonly CustomerAuditEventDto[];
+  readonly break_glass_sessions: readonly BreakGlassSessionSummaryDto[];
+}
+
+export interface BreakGlassCreateResponseDto {
+  readonly break_glass_id: CanonicalUuid;
+  readonly target_tenant_id: CanonicalUuid;
+  readonly read_only: boolean;
+  readonly token_once: string;
+  readonly started_at: CanonicalUtcTimestamp;
+  readonly expires_at: CanonicalUtcTimestamp;
+  readonly customer_audit_logged: boolean;
+}
+
+export interface BreakGlassRevokeResponseDto {
+  readonly break_glass_id: CanonicalUuid;
+  readonly target_tenant_id: CanonicalUuid;
+  readonly revoked_at: CanonicalUtcTimestamp;
+}
+
+export interface GdprErasureRequestDto {
+  readonly erasure_request_id: CanonicalUuid;
+  readonly org_id: CanonicalUuid;
+  readonly state: string;
+  readonly tax_records_retained_anonymized_years?: number | undefined;
+  readonly receipt_sha256: string | null;
+  readonly requested_at: CanonicalUtcTimestamp;
+  readonly completed_at?: CanonicalUtcTimestamp | null | undefined;
+}
+
 export function parsePlainObjectDto<T extends object>(raw: unknown, fieldPath = "data"): T {
   return assertPlainRecord(raw, fieldPath) as unknown as T;
 }

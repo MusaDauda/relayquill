@@ -23,8 +23,10 @@ export {
 } from "./db.js";
 export {
   ProviderVerificationError,
+  normalizeGithubPushCallback,
   normalizePaystackCallback,
   normalizeStripeCallback,
+  verifyGithubWebhookCallback,
   verifyPaystackWebhookCallback,
   verifyStripeWebhookCallback,
   type NormalizedProviderCallback
@@ -46,6 +48,7 @@ export {
   type ProviderIngressServerOptions
 } from "./server.js";
 export {
+  generateGithubPushWebhookFixture,
   generatePaystackWebhookFixture,
   generateStripeWebhookFixture,
   runProviderIngressFixtures,

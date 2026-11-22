@@ -12,6 +12,7 @@ import {
 import {
   type AccessSection,
   buildAccessPath,
+  buildOnboardingPath,
   buildPlatformPath,
   buildProjectPath,
   useConsoleRouter
@@ -131,6 +132,14 @@ export function AccessPage({ section }: { readonly section: AccessSection }): JS
   const [signInFeedback, setSignInFeedback] = useState<MutationFeedbackState>({
     kind: "idle"
   });
+  const [signInMode, setSignInMode] = useState<"passkey" | "password" | "signup">("passkey");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginTotp, setLoginTotp] = useState("");
+  const [signupOrgName, setSignupOrgName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [acceptLegalTerms, setAcceptLegalTerms] = useState(false);
 
   // Enrollment state
   const [enrollPurpose, setEnrollPurpose] = useState<"first_platform_admin" | "invited_human">(
@@ -274,6 +283,75 @@ export function AccessPage({ section }: { readonly section: AccessSection }): JS
     } else if ((loadedSession?.platform_roles.length ?? 0) > 0) {
       navigate(buildPlatformPath("tenants"));
     }
+  };
+
+  const handlePasswordSignIn = async (): Promise<void> => {
+    setSignInFeedback({
+      kind: "submitting",
+      label: "Verifying credentials..."
+    });
+    const res = await api.commercialLogin(
+      {
+        email: loginEmail.trim(),
+        password: loginPassword,
+        ...(loginTotp.trim().length > 0 ? { totp_code: loginTotp.trim() } : {})
+      },
+      generateIdempotencyKey("commercial-login")
+    );
+    if (!res.ok) {
+      setSignInFeedback({ kind: "failed", error: res });
+      return;
+    }
+    const loadedSession = await refreshSession();
+    setLoginPassword("");
+    setLoginTotp("");
+    setSignInFeedback({
+      kind: "succeeded",
+      title: "Signed In",
+      detail: `Authenticated commercial session for tenant ${res.data.tenant_id}.`
+    });
+    const firstWorkspace = loadedSession?.workspaces[0];
+    if (firstWorkspace !== undefined) {
+      navigate(
+        buildProjectPath(
+          firstWorkspace.tenant_id,
+          firstWorkspace.project_id,
+          "overview"
+        )
+      );
+    } else {
+      navigate(buildOnboardingPath());
+    }
+  };
+
+  const handleCommercialSignup = async (): Promise<void> => {
+    setSignInFeedback({
+      kind: "submitting",
+      label: "Creating organization, free-tier quota, and legal audit records..."
+    });
+    const res = await api.commercialSignup(
+      {
+        email: signupEmail.trim(),
+        password: signupPassword,
+        org_name: signupOrgName.trim(),
+        accept_legal: true,
+        tos_version: "2026-11-01",
+        dpa_version: "2026-11-01"
+      },
+      generateIdempotencyKey("commercial-signup")
+    );
+    if (!res.ok) {
+      setSignInFeedback({ kind: "failed", error: res });
+      return;
+    }
+    await refreshSession();
+    setSignupPassword("");
+    setSignInFeedback({
+      kind: "succeeded",
+      title: "Organization Created",
+      detail: `Provisioned workspace ${res.data.tenant_slug} on ${res.data.plan_tier.toUpperCase()} tier.`
+    });
+    navigate(buildOnboardingPath());
   };
 
   const handleStartEnrollmentIntent = async (): Promise<void> => {
@@ -483,12 +561,37 @@ export function AccessPage({ section }: { readonly section: AccessSection }): JS
           type="button"
           role="tab"
           className="rq-tab"
-          aria-selected={section === "sign-in"}
+          aria-selected={section === "sign-in" && signInMode === "passkey"}
           onClick={() => {
+            setSignInMode("passkey");
             navigate(buildAccessPath("sign-in"));
           }}
         >
           Passkey Sign-In
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className="rq-tab"
+          aria-selected={section === "sign-in" && signInMode === "password"}
+          onClick={() => {
+            setSignInMode("password");
+            navigate(buildAccessPath("sign-in"));
+          }}
+        >
+          Password &amp; TOTP
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className="rq-tab"
+          aria-selected={section === "sign-in" && signInMode === "signup"}
+          onClick={() => {
+            setSignInMode("signup");
+            navigate(buildAccessPath("sign-in"));
+          }}
+        >
+          Create Account
         </button>
         <button
           type="button"
@@ -513,6 +616,173 @@ export function AccessPage({ section }: { readonly section: AccessSection }): JS
           Factor Recovery
         </button>
       </div>
+
+      {section === "sign-in" && signInMode === "password" ? (
+        <section className="rq-card" aria-label="Commercial Email Password Sign-In">
+          <div className="rq-card-header">
+            <h2 className="rq-section-title">Password &amp; TOTP Sign-In</h2>
+            <StatusBadge status="verified_supported" label="Argon2id + Optional MFA" />
+          </div>
+          <div className="rq-grid-3">
+            <FormField label="Work Email" required>
+              {({ inputId, describedBy }) => (
+                <input
+                  id={inputId}
+                  aria-describedby={describedBy}
+                  type="email"
+                  autoComplete="email"
+                  className="rq-input"
+                  value={loginEmail}
+                  onChange={(e) => {
+                    setLoginEmail(e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
+            <FormField label="Password" required>
+              {({ inputId, describedBy }) => (
+                <input
+                  id={inputId}
+                  aria-describedby={describedBy}
+                  type="password"
+                  autoComplete="current-password"
+                  className="rq-input"
+                  value={loginPassword}
+                  onChange={(e) => {
+                    setLoginPassword(e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
+            <FormField label="TOTP MFA Code (If Enrolled)">
+              {({ inputId, describedBy }) => (
+                <input
+                  id={inputId}
+                  aria-describedby={describedBy}
+                  type="text"
+                  inputMode="numeric"
+                  className="rq-input mono"
+                  placeholder="6-digit code"
+                  value={loginTotp}
+                  onChange={(e) => {
+                    setLoginTotp(e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
+          </div>
+          <MutationFeedback
+            state={signInFeedback}
+            resourceLabel="Commercial sign-in"
+            onDismiss={() => {
+              setSignInFeedback({ kind: "idle" });
+            }}
+          />
+          <div className="rq-row">
+            <button
+              type="button"
+              className="rq-btn rq-btn-primary"
+              disabled={loginEmail.trim().length === 0 || loginPassword.length === 0}
+              onClick={() => {
+                void handlePasswordSignIn();
+              }}
+            >
+              Sign In with Password
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {section === "sign-in" && signInMode === "signup" ? (
+        <section className="rq-card" aria-label="Self-Serve Commercial Organization Signup">
+          <div className="rq-card-header">
+            <h2 className="rq-section-title">Create Organization Account</h2>
+            <StatusBadge status="active" label="Free Plan Included" />
+          </div>
+          <div className="rq-grid-3">
+            <FormField label="Organization Name" required>
+              {({ inputId, describedBy }) => (
+                <input
+                  id={inputId}
+                  aria-describedby={describedBy}
+                  type="text"
+                  className="rq-input"
+                  value={signupOrgName}
+                  onChange={(e) => {
+                    setSignupOrgName(e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
+            <FormField label="Work Email" required>
+              {({ inputId, describedBy }) => (
+                <input
+                  id={inputId}
+                  aria-describedby={describedBy}
+                  type="email"
+                  autoComplete="email"
+                  className="rq-input"
+                  value={signupEmail}
+                  onChange={(e) => {
+                    setSignupEmail(e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
+            <FormField label="Password (Min 12 chars)" required>
+              {({ inputId, describedBy }) => (
+                <input
+                  id={inputId}
+                  aria-describedby={describedBy}
+                  type="password"
+                  autoComplete="new-password"
+                  className="rq-input"
+                  value={signupPassword}
+                  onChange={(e) => {
+                    setSignupPassword(e.target.value);
+                  }}
+                />
+              )}
+            </FormField>
+          </div>
+          <label className="rq-checkbox-row">
+            <input
+              type="checkbox"
+              checked={acceptLegalTerms}
+              onChange={(e) => {
+                setAcceptLegalTerms(e.target.checked);
+              }}
+            />
+            <span>
+              I accept the Terms of Service and Data Processing Addendum (version 2026-11-01).
+            </span>
+          </label>
+          <MutationFeedback
+            state={signInFeedback}
+            resourceLabel="Organization signup"
+            onDismiss={() => {
+              setSignInFeedback({ kind: "idle" });
+            }}
+          />
+          <div className="rq-row">
+            <button
+              type="button"
+              className="rq-btn rq-btn-primary"
+              disabled={
+                !acceptLegalTerms ||
+                signupOrgName.trim().length === 0 ||
+                signupEmail.trim().length === 0 ||
+                signupPassword.length < 12
+              }
+              onClick={() => {
+                void handleCommercialSignup();
+              }}
+            >
+              Create Account &amp; Start Onboarding
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {session !== null ? (
         <section className="rq-card" aria-label="Active session security">
@@ -577,7 +847,7 @@ export function AccessPage({ section }: { readonly section: AccessSection }): JS
         </section>
       ) : null}
 
-      {section === "sign-in" ? (
+      {section === "sign-in" && signInMode === "passkey" ? (
         <section className="rq-card" aria-labelledby="signin-heading">
           <div className="rq-card-header">
             <h2 id="signin-heading" className="rq-section-title">

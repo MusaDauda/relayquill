@@ -4,6 +4,7 @@ import { parseCanonicalUtcTimestamp, canonicalizeJson, sha256Hex, type Canonical
 import { type AccountMode, type ProviderBindingRecord, type ProviderKind } from "./db.js";
 
 const PAYSTACK_SIGNATURE_HEX_REGEX = /^[0-9a-f]{128}$/;
+const GITHUB_SIGNATURE_REGEX = /^sha256=([0-9a-f]{64})$/;
 
 export class ProviderVerificationError extends Error {
   readonly code: string;
@@ -312,6 +313,148 @@ export function normalizePaystackCallback(params: {
 
   return {
     provider: "paystack",
+    accountMode: params.binding.accountMode,
+    payloadProfile: params.binding.payloadProfile,
+    providerEventId,
+    eventType,
+    objectReference,
+    providerBusinessTime,
+    rawBodySha256Hex,
+    identityProfile,
+    semanticKeySha256Hex,
+    normalizedFacts,
+    normalizedFactsSha256Hex,
+    businessKey,
+    requestKey
+  };
+}
+
+export function verifyGithubWebhookCallback(params: {
+  readonly rawBodyBytes: Uint8Array;
+  readonly signatureHeader: string | undefined;
+  readonly webhookSecret: string;
+}): Readonly<Record<string, unknown>> {
+  if (params.signatureHeader === undefined || params.signatureHeader.trim().length === 0) {
+    throw new ProviderVerificationError({
+      code: "MISSING_GITHUB_SIGNATURE",
+      httpStatus: 401,
+      message: "Missing x-hub-signature-256 header"
+    });
+  }
+  const match = GITHUB_SIGNATURE_REGEX.exec(params.signatureHeader.trim());
+  if (match === null || match[1] === undefined) {
+    throw new ProviderVerificationError({
+      code: "INVALID_GITHUB_SIGNATURE_FORMAT",
+      httpStatus: 401,
+      message: "x-hub-signature-256 must match sha256=<64 lowercase hex chars>"
+    });
+  }
+
+  const expectedDigest = crypto
+    .createHmac("sha256", params.webhookSecret)
+    .update(params.rawBodyBytes)
+    .digest();
+  const actualDigest = Buffer.from(match[1], "hex");
+  if (
+    expectedDigest.byteLength !== actualDigest.byteLength ||
+    !crypto.timingSafeEqual(expectedDigest, actualDigest)
+  ) {
+    throw new ProviderVerificationError({
+      code: "GITHUB_SIGNATURE_VERIFICATION_FAILED",
+      httpStatus: 401,
+      message: "GitHub HMAC-SHA256 verification failed"
+    });
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(params.rawBodyBytes).toString("utf8"));
+  } catch (err) {
+    throw new ProviderVerificationError({
+      code: "INVALID_GITHUB_JSON",
+      httpStatus: 400,
+      message: "Invalid GitHub JSON payload",
+      cause: err
+    });
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new ProviderVerificationError({
+      code: "INVALID_GITHUB_OBJECT",
+      httpStatus: 400,
+      message: "GitHub webhook payload must be a JSON object"
+    });
+  }
+  return parsed as Readonly<Record<string, unknown>>;
+}
+
+function asPlainObject(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Readonly<Record<string, unknown>>)
+    : undefined;
+}
+
+export function normalizeGithubPushCallback(params: {
+  readonly binding: ProviderBindingRecord;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly rawBodyBytes: Uint8Array;
+  readonly deliveryId?: string | undefined;
+  readonly eventHeader?: string | undefined;
+}): NormalizedProviderCallback {
+  const rawBodySha256Hex = sha256Hex(params.rawBodyBytes);
+  const rawHeaderEvent = readOptionalNonEmptyString(params.eventHeader) ?? "push";
+  const eventType = rawHeaderEvent.startsWith("github.")
+    ? rawHeaderEvent
+    : `github.${rawHeaderEvent}`;
+  const providerEventId = readOptionalNonEmptyString(params.deliveryId);
+
+  const repository = asPlainObject(params.payload["repository"]);
+  const headCommit = asPlainObject(params.payload["head_commit"]);
+  const commits = Array.isArray(params.payload["commits"]) ? params.payload["commits"] : [];
+
+  const repositoryFullName = readOptionalNonEmptyString(repository?.["full_name"]);
+  const gitRef = readOptionalNonEmptyString(params.payload["ref"]);
+  const beforeSha = readOptionalNonEmptyString(params.payload["before"]);
+  const afterSha = readOptionalNonEmptyString(params.payload["after"]);
+  const headCommitId = readOptionalNonEmptyString(headCommit?.["id"]);
+  const objectReference = headCommitId ?? afterSha ?? repositoryFullName ?? null;
+  const providerBusinessTime = normalizeIsoTimestamp(headCommit?.["timestamp"]);
+
+  const identityProfile = "github.push.v1";
+  const semanticSeed =
+    providerEventId !== null
+      ? `github:${params.binding.id}:${providerEventId}`
+      : `github:${params.binding.id}:${repositoryFullName ?? "repo"}:${gitRef ?? "ref"}:${afterSha ?? rawBodySha256Hex}`;
+  const semanticKeySha256Hex = crypto.createHash("sha256").update(semanticSeed, "utf8").digest("hex");
+
+  const normalizedFacts: Record<string, unknown> = {
+    schema_version: 1,
+    provider: "github",
+    account_mode: params.binding.accountMode,
+    payload_profile: params.binding.payloadProfile,
+    provider_event_id: providerEventId,
+    event_type: eventType,
+    object_reference: objectReference,
+    provider_business_time: providerBusinessTime,
+    repository_full_name: repositoryFullName,
+    ref: gitRef,
+    before: beforeSha,
+    after: afterSha,
+    commit_count: commits.length
+  };
+  const canonicalFacts = canonicalizeJson(
+    normalizedFacts as unknown as CanonicalJsonValue,
+    "normalized_facts"
+  );
+  const normalizedFactsSha256Hex = sha256Hex(Buffer.from(canonicalFacts, "utf8"));
+  const semanticAnchor =
+    providerEventId ?? `${repositoryFullName ?? "repo"}:${afterSha ?? rawBodySha256Hex}`;
+  const businessKey = normalizeSafeBusinessKey(
+    `github:${params.binding.id}:${eventType}:${semanticAnchor}`
+  );
+  const requestKey = normalizeSafeRequestKey(`pi:${businessKey}`);
+
+  return {
+    provider: "github",
     accountMode: params.binding.accountMode,
     payloadProfile: params.binding.payloadProfile,
     providerEventId,

@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { StatusBadge } from "../components/StatusBadge.js";
+import { consoleTelemetry } from "../utils/telemetry.js";
 
 interface ErrorBoundaryProps {
   readonly children: ReactNode;
@@ -23,8 +24,9 @@ export class ConsoleErrorBoundary extends Component<ErrorBoundaryProps, ErrorBou
     return { hasError: true, safeMessage };
   }
 
-  override componentDidCatch(_error: Error, _info: ErrorInfo): void {
-    // Do not persist or export client crash telemetry containing private workspace state.
+  override componentDidCatch(error: Error, _info: ErrorInfo): void {
+    const route = typeof window !== "undefined" ? window.location.pathname : "/";
+    consoleTelemetry.captureException(error, { route, component: "ConsoleErrorBoundary" });
   }
 
   override render(): ReactNode {

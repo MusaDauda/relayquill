@@ -1,3 +1,4 @@
+import { createCommercialConsoleApiMethods } from "./commercial-api.js";
 import {
   type AdmitEventResultDto,
   type AttemptSummaryDto,
@@ -104,6 +105,7 @@ export function createConsoleApi(http: ConsoleHttpClient) {
         signal
       });
     },
+    ...createCommercialConsoleApiMethods(http),
     logout(idempotencyKey: string): Promise<HttpApiResult<GenericMutationResultDto>> {
       return http.request({
         method: "POST",

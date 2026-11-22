@@ -19,7 +19,10 @@ export const RQ_DATABASE_ROLES = [
   "rq_reporter",
   "rq_signing_issuer",
   "rq_migrator",
-  "rq_recovery"
+  "rq_recovery",
+  "rq_billing",
+  "rq_audit_ro",
+  "rq_worker"
 ] as const;
 export type RqDatabaseRole = (typeof RQ_DATABASE_ROLES)[number];
 

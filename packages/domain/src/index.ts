@@ -2,6 +2,7 @@ export const DOMAIN_PACKAGE_VERSION = "0.1.0" as const;
 
 export * from "./access.js";
 export * from "./attempt.js";
+export * from "./billing.js";
 export * from "./circuit.js";
 export * from "./console.js";
 export * from "./delivery.js";

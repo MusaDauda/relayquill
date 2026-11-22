@@ -41,6 +41,31 @@ services:
     volumes:
       - ./otel/collector-dev.yaml:/etc/otelcol-contrib/config.yaml:ro
 
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:5379:6379"
+    volumes:
+      - relayquill_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  stripe-mock:
+    image: stripe/stripe-mock:v0.194.0
+    ports:
+      - "127.0.0.1:5111:12111"
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "127.0.0.1:5025:1025"
+      - "127.0.0.1:5825:8025"
+
 volumes:
   relayquill_pg18:
   relayquill_jetstream:
+  relayquill_redis:

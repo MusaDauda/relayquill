@@ -50,6 +50,27 @@ test("clean temp git repo with ignore rules passes", (t) => {
   assert.equal(report.commitsScanned, 1);
 });
 
+test("supports suffixed local scratch directory ignore entries and blocks tracking them", (t) => {
+  const dir = createTempGitRepo(t);
+  const suffixedDir = `${SPEC_DIR}-Latest`;
+  fs.writeFileSync(path.join(dir, ".gitignore"), `/${SPEC_DIR}/\n/${suffixedDir}/\nnode_modules/\n`, "utf8");
+  fs.writeFileSync(path.join(dir, ".dockerignore"), `/${SPEC_DIR}/\n/${suffixedDir}/\n.git/\n`, "utf8");
+  fs.mkdirSync(path.join(dir, suffixedDir), { recursive: true });
+  fs.writeFileSync(path.join(dir, suffixedDir, "notes.md"), "ignored external notes\n", "utf8");
+  fs.writeFileSync(path.join(dir, "index.js"), "export const ready = true;\n", "utf8");
+
+  git(dir, ["add", ".gitignore", ".dockerignore", "index.js"]);
+  git(dir, ["commit", "-m", "feat: add suffixed ignore rule"]);
+
+  const cleanReport = checkRepoHygiene(dir);
+  assert.equal(cleanReport.ok, true, JSON.stringify(cleanReport.violations, null, 2));
+
+  git(dir, ["add", "-f", `${suffixedDir}/notes.md`]);
+  const trackedReport = checkRepoHygiene(dir);
+  assert.equal(trackedReport.ok, false);
+  assert.ok(trackedReport.violations.some((v) => v.rule === "tracked_spec_dir" && v.file === `${suffixedDir}/notes.md`));
+});
+
 test("gitignore exempts only the exact exclusion line and flags forbidden comments", () => {
   const badWord = ["hand", "book"].join("");
   const text = `/${SPEC_DIR}/\n# ignore old ${badWord}\nnode_modules/\n`;

@@ -103,8 +103,8 @@ const SECRET_KEY_SUFFIXES = [
 
 const FORBIDDEN_SECRET_JSON_KEY = new RegExp(`(?:^|[_-])(?:${SECRET_KEY_SUFFIXES})$`, "i");
 
-const ALLOWED_EXCLUSION_LINE_REGEX = new RegExp(`^/?${SPEC_DIR_NAME}/?$`);
-const TRACKED_SPEC_DIR_REGEX = new RegExp(`^${SPEC_DIR_NAME}(?:/|$)`);
+const ALLOWED_EXCLUSION_LINE_REGEX = new RegExp(`^/?${SPEC_DIR_NAME}(?:[\\s_-]+[A-Za-z0-9_-]+)*/?$`);
+const TRACKED_SPEC_DIR_REGEX = new RegExp(`^${SPEC_DIR_NAME}(?:[\\s_-]+[A-Za-z0-9_-]+)*(?:/|$)`);
 const POSTGRES_CRED_URL_REGEX = /postgres(?:ql)?:\/\/[^/\s:@]+:[^/\s@]+@/i;
 
 function normalizeRelPath(filePath) {

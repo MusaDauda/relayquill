@@ -5,6 +5,7 @@ export * from "./parsers.js";
 export * from "./errors.js";
 export * from "./mappers.js";
 export * from "./transaction.js";
+export * from "./rls.js";
 export * from "./pool.js";
 export * from "./pglite.js";
 export * from "./repositories/index.js";

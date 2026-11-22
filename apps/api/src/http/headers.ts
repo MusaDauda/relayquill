@@ -21,6 +21,7 @@ const SINGLE_OCCURRENCE_HEADERS = [
   "x-csrf-token",
   "x-relayquill-csrf",
   "x-relayquill-step-up",
+  "x-relayquill-break-glass",
   "origin",
   "last-event-id"
 ] as const;

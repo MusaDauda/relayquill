@@ -72,6 +72,8 @@ export function createApiServer(options: CreateApiServerOptions): ApiServerHandl
     sseHeartbeatMs: options.sseHeartbeatMs,
     sseMaxLifetimeMs: options.sseMaxLifetimeMs,
     cursorSigningKey: options.cursorSigningKey,
+    totpReplayStore: options.totpReplayStore,
+    totpEncryptionKey: options.totpEncryptionKey,
     logger
   });
 

@@ -19,8 +19,10 @@ import {
   type AuthenticatedHumanSession,
   type AuthorizedHumanDecision,
   GOVERNANCE_ACTION_POLICIES,
+  InMemoryTotpReplayGuardStore,
   type NormalizedAuthPolicyConfig,
   type ProducerCredentialSafeMetadata,
+  type TotpReplayGuardStore,
   authenticateHumanSession,
   authenticateProducerCredential,
   authenticateSessionMutation,
@@ -121,6 +123,8 @@ export interface ApiContext {
   readonly sseHeartbeatMs: number;
   readonly sseMaxLifetimeMs: number;
   readonly cursorSigningKey?: Uint8Array | undefined;
+  readonly totpReplayStore: TotpReplayGuardStore;
+  readonly totpEncryptionKey: Uint8Array;
   readonly logger: FastifyBaseLogger;
 }
 
@@ -138,6 +142,8 @@ export interface CreateApiContextOptions {
   readonly sseHeartbeatMs?: number | undefined;
   readonly sseMaxLifetimeMs?: number | undefined;
   readonly cursorSigningKey?: Uint8Array | undefined;
+  readonly totpReplayStore?: TotpReplayGuardStore | undefined;
+  readonly totpEncryptionKey?: Uint8Array | undefined;
   readonly logger: FastifyBaseLogger;
 }
 
@@ -239,6 +245,10 @@ export function createApiContext(options: CreateApiContextOptions): ApiContext {
   const allowDevBootstrapRoute =
     options.allowDevBootstrapRoute ??
     (profile === "development_trusted_local" || profile === "portable_pglite");
+  const totpReplayStore = options.totpReplayStore ?? new InMemoryTotpReplayGuardStore();
+  const totpEncryptionKey =
+    options.totpEncryptionKey ??
+    crypto.createHash("sha256").update("relayquill-local-totp-envelope-v1", "utf8").digest();
 
   return {
     pgAdapter,
@@ -261,6 +271,8 @@ export function createApiContext(options: CreateApiContextOptions): ApiContext {
     sseHeartbeatMs: options.sseHeartbeatMs ?? 10_000,
     sseMaxLifetimeMs: options.sseMaxLifetimeMs ?? 60_000,
     cursorSigningKey: options.cursorSigningKey,
+    totpReplayStore,
+    totpEncryptionKey,
     logger: options.logger
   };
 }

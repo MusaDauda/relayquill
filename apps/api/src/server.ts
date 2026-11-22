@@ -11,10 +11,15 @@ import { registerEventsAndDeliveriesRoutes } from "./routes/events-and-deliverie
 import { registerGovernanceAndStreamsRoutes } from "./routes/governance-and-streams.js";
 import { registerHealthAndAccessRoutes } from "./routes/health-and-access.js";
 import { registerPlatformAndProjectRoutes } from "./routes/platform-and-projects.js";
+import {
+  enforceBreakGlassRequestGuard,
+  registerCommercialAuthAndOpsRoutes
+} from "./routes/commercial-auth-and-ops.js";
 
 const EMPTY_BODY_OPTIONAL_PATHS = new Set([
   "/api/v1/session/logout",
-  "/api/v1/session/csrf"
+  "/api/v1/session/csrf",
+  "/api/v1/auth/logout"
 ]);
 
 export function createApiFastifyServer(ctx: ApiContext): FastifyInstance {
@@ -66,6 +71,10 @@ export function createApiFastifyServer(ctx: ApiContext): FastifyInstance {
     requestStartedAt.set(request, Date.now());
     assertStrictRawHeaders(request.raw.rawHeaders);
     done();
+  });
+
+  app.addHook("preHandler", async (request) => {
+    await enforceBreakGlassRequestGuard(ctx, request);
   });
 
   app.addHook("onSend", (_request, reply, payload, done) => {
@@ -136,6 +145,7 @@ export function createApiFastifyServer(ctx: ApiContext): FastifyInstance {
   });
 
   registerHealthAndAccessRoutes(app, ctx);
+  registerCommercialAuthAndOpsRoutes(app, ctx);
   registerPlatformAndProjectRoutes(app, ctx);
   registerEventsAndDeliveriesRoutes(app, ctx);
   registerGovernanceAndStreamsRoutes(app, ctx);
